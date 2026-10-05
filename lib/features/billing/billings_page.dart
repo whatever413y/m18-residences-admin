@@ -103,14 +103,19 @@ class BillingsPageState extends State<BillingsPage> {
       ),
       TableColumn('Date', (bill) => Text(_dateFormat.format(bill.createdAt)), sortKey: (bill) => bill.createdAt),
       TableColumn(
+        'Status',
+        (bill) => Semantics(container: true, identifier: 'bill-status-${tenantName(bill)}', child: BillStatusChip(bill.status)),
+        sortKey: (bill) => bill.status.index,
+      ),
+      TableColumn(
+        'Payment',
+        (bill) => bill.hasPayment ? buildBillFile(context, BillFileKind.payment, tenants[bill.tenantId]?.name, bill.paymentUrl) : const Text('-'),
+        sortKey: (bill) => bill.hasPayment ? 1 : 0,
+      ),
+      TableColumn(
         'Receipt',
-        (bill) => bill.hasReceipt
-            ? ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 200),
-                child: buildReceipt(context, tenants[bill.tenantId]?.name, bill.receiptUrl),
-              )
-            : const Text('Unpaid'),
-        sortKey: (bill) => bill.receiptUrl ?? '',
+        (bill) => bill.hasReceipt ? buildBillFile(context, BillFileKind.receipt, tenants[bill.tenantId]?.name, bill.receiptUrl) : const Text('-'),
+        sortKey: (bill) => bill.hasReceipt ? 1 : 0,
       ),
       TableColumn('Room', (bill) => Text(roomName(bill)), sortKey: (bill) => roomName(bill).toLowerCase()),
     ];
@@ -152,7 +157,11 @@ class BillingsPageState extends State<BillingsPage> {
 
     // Replaced by the bloc's result (see the listener).
     CustomSnackbar.show(context, bill != null ? 'Updating bill...' : 'Creating bill...', type: SnackBarType.loading);
-    billingBloc.add(bill != null ? UpdateBill(bill.id, result.request, receipt: result.receipt) : AddBill(result.request, receipt: result.receipt));
+    billingBloc.add(
+      bill != null
+          ? UpdateBill(bill.id, result.request, receipt: result.receipt, payment: result.payment)
+          : AddBill(result.request, receipt: result.receipt, payment: result.payment),
+    );
   }
 
   Future<void> _deleteBill(int id) async {
@@ -173,6 +182,14 @@ class BillingsPageState extends State<BillingsPage> {
         roomName: room?.name ?? 'Unknown Room',
         consumption: bill.consumption.toString(),
         date: _dateFormat.format(bill.createdAt),
+        onUploadPayment: (payment) {
+          CustomSnackbar.show(context, 'Attaching payment...', type: SnackBarType.loading);
+          billingBloc.add(UploadPayment(bill.id, payment));
+        },
+        onClearPayment: () {
+          CustomSnackbar.show(context, 'Removing payment...', type: SnackBarType.loading);
+          billingBloc.add(ClearPayment(bill.id));
+        },
       ),
     );
   }
@@ -214,6 +231,8 @@ class BillingsPageState extends State<BillingsPage> {
                   CustomSnackbar.show(context, 'Bill updated', type: SnackBarType.success);
                 } else if (state is DeleteSuccess) {
                   CustomSnackbar.show(context, 'Bill deleted', type: SnackBarType.success);
+                } else if (state is PaymentSuccess) {
+                  CustomSnackbar.show(context, state.message, type: SnackBarType.success);
                 }
               },
               child: BlocBuilder<BillingBloc, BillingState>(
@@ -247,7 +266,7 @@ class BillingsPageState extends State<BillingsPage> {
 
   Widget _buildContent(BuildContext context, _BillsView view) {
     final state = view.state;
-    // Wider than other pages: the bill table has ten columns.
+    // Wider than other pages: the bill table has twelve columns.
     return ResponsiveCenter(
       maxWidth: 1600,
       child: Padding(
@@ -311,7 +330,7 @@ class BillingsPageState extends State<BillingsPage> {
                           _sortAscending = ascending;
                         }),
                         // Narrower screens get cards: the table needs about this much width.
-                        tableMinWidth: 1240,
+                        tableMinWidth: 1500,
                         onTap: (bill) => _showBillingDetailsDialog(bill, view),
                         actions: (bill) => _actions(bill, view),
                       ),
@@ -343,7 +362,7 @@ class BillingsPageState extends State<BillingsPage> {
             context: context,
             messenger: ScaffoldMessenger.of(context),
             confirmTitle: 'Delete Bill',
-            confirmContent: 'Are you sure you want to delete this bill? Its receipt is deleted too.',
+            confirmContent: 'Are you sure you want to delete this bill? Its receipt and payment are deleted too.',
             onConfirmed: () => _deleteBill(bill.id),
           ),
         ),

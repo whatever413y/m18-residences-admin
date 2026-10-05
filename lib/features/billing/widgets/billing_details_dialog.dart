@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_admin/features/billing/widgets/attach_file_button.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -10,6 +11,12 @@ class BillingDetailsDialog extends StatelessWidget {
   final String consumption;
   final String date;
 
+  /// Called with a picked (and converted) payment image; the dialog closes.
+  final ValueChanged<PreparedReceipt> onUploadPayment;
+
+  /// Called after the admin confirmed removing the payment image; the dialog closes.
+  final VoidCallback onClearPayment;
+
   const BillingDetailsDialog({
     super.key,
     required this.bill,
@@ -17,17 +24,19 @@ class BillingDetailsDialog extends StatelessWidget {
     required this.roomName,
     required this.consumption,
     required this.date,
+    required this.onUploadPayment,
+    required this.onClearPayment,
   });
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
+        constraints: const BoxConstraints(maxWidth: 440),
         child: Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 12,
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -39,8 +48,8 @@ class BillingDetailsDialog extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildDetails(),
                 const SizedBox(height: 24),
-                if (bill.hasReceipt) buildReceipt(context, tenantName, bill.receiptUrl),
-                _spacer(),
+                _buildFiles(context),
+                const SizedBox(height: 24),
                 _buildCloseButton(context),
               ],
             ),
@@ -48,6 +57,82 @@ class BillingDetailsDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Status, the payment image (attach, change, remove) and the receipt.
+  Widget _buildFiles(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('Status', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Spacer(),
+            Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text('Payment from tenant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (!bill.hasPayment) const Text('No payment uploaded', style: TextStyle(color: Colors.grey)),
+            Semantics(
+              container: true,
+              identifier: 'bill-view-payment',
+              child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
+            ),
+            AttachFileButton(
+              kind: BillFileKind.payment,
+              hasFile: bill.hasPayment,
+              onChanged: (payment) {
+                if (payment == null) return;
+                Navigator.of(context).pop();
+                onUploadPayment(payment);
+              },
+            ),
+            if (bill.hasPayment)
+              Semantics(
+                container: true,
+                identifier: 'bill-remove-payment',
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.red.shade800, minimumSize: const Size(48, 48)),
+                  onPressed: () => _confirmClearPayment(context),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Remove'),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text('Receipt from owner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        if (bill.hasReceipt)
+          buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl)
+        else
+          const Text('No receipt yet: attach one with Edit bill', style: TextStyle(color: Colors.grey)),
+      ],
+    );
+  }
+
+  Future<void> _confirmClearPayment(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Payment'),
+        content: Text("Remove $tenantName's payment image from this bill? The file is deleted."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    Navigator.of(context).pop();
+    onClearPayment();
   }
 
   Widget _buildTitle() {

@@ -1,10 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/features/billing/receipt_converter.dart';
+import 'package:m18_residences_admin/features/billing/widgets/attach_file_button.dart';
 import 'package:m18_residences_admin/utils/form_dialog.dart';
-import 'package:m18_residences_admin/utils/pick_file.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -15,12 +12,13 @@ class AdditionalChargeInput {
   AdditionalChargeInput({this.amount = 0, this.description = ''});
 }
 
-/// What the bill form returns: the bill to send, and the receipt picked for it (if any).
+/// What the bill form returns: the bill to send, and the receipt and payment image picked for it (if any).
 class BillFormResult {
   final BillRequest request;
   final PreparedReceipt? receipt;
+  final PreparedReceipt? payment;
 
-  const BillFormResult(this.request, this.receipt);
+  const BillFormResult(this.request, this.receipt, this.payment);
 }
 
 class BillingFormDialog extends StatefulWidget {
@@ -61,11 +59,14 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   int? _selectedTenantId;
   int? _selectedReadingId;
 
-  /// The picked receipt, converted for upload.
+  /// The picked receipt and payment image, converted for upload.
   PreparedReceipt? _receipt;
-  bool _preparingReceipt = false;
-  String? _receiptError;
+  PreparedReceipt? _payment;
+
+  /// How many picked files are being converted; the form can't be saved meanwhile.
+  int _preparing = 0;
   String? _receiptUrl;
+  String? _paymentUrl;
 
   /// Why the form can't be saved yet (shown above the buttons), e.g. a tenant without a reading.
   String? _formError;
@@ -98,6 +99,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       final impliedRate = _calculateElectricityRate(bill.electricCharges, reading);
       _electricityRateController.text = impliedRate.toString();
       _receiptUrl = bill.receiptUrl;
+      _paymentUrl = bill.paymentUrl;
     } else {
       _electricityRateController.text = '17';
       _selectedRoomId = widget.selectedRoomId;
@@ -122,36 +124,6 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     }
 
     super.dispose();
-  }
-
-  Future<void> _pickReceiptFile() async {
-    final ({String name, Uint8List bytes})? file;
-    try {
-      file = await pickFile(receiptExtensions);
-    } catch (e) {
-      setState(() => _receiptError = 'Could not open the file picker: $e');
-      return;
-    }
-    // Cancelling the picker keeps the receipt picked before (if any).
-    if (file == null || !mounted) return;
-
-    setState(() {
-      _preparingReceipt = true;
-      _receiptError = null;
-    });
-    try {
-      final prepared = await prepareReceipt(file.name, file.bytes);
-      if (!mounted) return;
-      setState(() => _receipt = prepared);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _receipt = null;
-        _receiptError = e is ReceiptException ? e.message : 'Could not read the file: $e';
-      });
-    } finally {
-      if (mounted) setState(() => _preparingReceipt = false);
-    }
   }
 
   Reading? _getLatestReading(int? roomId, int? tenantId) {
@@ -220,7 +192,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   }
 
   void _submit() {
-    if (_preparingReceipt) return;
+    if (_preparing > 0) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final tenantId = _selectedTenantId!;
     final readingId = _selectedReadingId;
@@ -245,7 +217,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       additionalCharges: additionalCharges,
       receiptUrl: _receiptUrl,
     );
-    Navigator.of(context).pop(BillFormResult(request, _receipt));
+    Navigator.of(context).pop(BillFormResult(request, _receipt, _payment));
   }
 
   @override
@@ -276,7 +248,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
             const SizedBox(height: 16),
             _buildAdditionalChargesList(),
             const SizedBox(height: 16),
-            _buildUploadButton(),
+            _buildAttachButtons(),
             if (_formError != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -288,54 +260,29 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     );
   }
 
-  static String _size(int bytes) => bytes >= 1024 * 1024 ? '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB' : '${(bytes / 1024).ceil()} KB';
+  void _onPreparing(bool preparing) => setState(() => _preparing += preparing ? 1 : -1);
 
-  String _receiptLabel(PreparedReceipt receipt) => receipt.wasConverted
-      ? '${receipt.filename} · ${_size(receipt.bytes.length)} (was ${_size(receipt.originalSize)})'
-      : '${receipt.filename} · ${_size(receipt.bytes.length)}';
-
-  Widget _buildUploadButton() {
+  /// The receipt (the bill is paid once it has one) and the tenant's optional payment image.
+  Widget _buildAttachButtons() {
     final tenantName = widget.tenants.firstWhereOrNull((t) => t.id == _selectedTenantId)?.name;
-    final hasReceipt = _receipt != null || (_receiptUrl?.isNotEmpty ?? false);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 24,
+      runSpacing: 16,
       children: [
-        Semantics(
-          identifier: 'bill-attach-receipt',
-          child: ElevatedButton.icon(
-            onPressed: _preparingReceipt ? null : _pickReceiptFile,
-            icon: const Icon(Icons.attach_file),
-            label: Text(hasReceipt ? 'Change Receipt' : 'Attach Receipt'),
-          ),
+        AttachFileButton(
+          kind: BillFileKind.receipt,
+          hasFile: _receiptUrl?.isNotEmpty ?? false,
+          onChanged: (file) => setState(() => _receipt = file),
+          onPreparing: _onPreparing,
+          current: buildBillFile(context, BillFileKind.receipt, tenantName, _receiptUrl),
         ),
-        if (_preparingReceipt)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Row(
-              children: [
-                SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 8),
-                Text('Preparing receipt...', style: TextStyle(fontStyle: FontStyle.italic)),
-              ],
-            ),
-          )
-        else if (_receiptError != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_receiptError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          )
-        else if (_receipt != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Semantics(
-              container: true,
-              identifier: 'bill-receipt-file',
-              child: Text(_receiptLabel(_receipt!), style: const TextStyle(fontStyle: FontStyle.italic)),
-            ),
-          )
-        else if (_receiptUrl?.isNotEmpty ?? false)
-          buildReceipt(context, tenantName, _receiptUrl),
+        AttachFileButton(
+          kind: BillFileKind.payment,
+          hasFile: _paymentUrl?.isNotEmpty ?? false,
+          onChanged: (file) => setState(() => _payment = file),
+          onPreparing: _onPreparing,
+          current: buildBillFile(context, BillFileKind.payment, tenantName, _paymentUrl),
+        ),
       ],
     );
   }
@@ -456,8 +403,8 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
         container: true,
         identifier: 'bill-save',
         child: ElevatedButton(
-          // Disabled while the picked receipt is being converted.
-          onPressed: _preparingReceipt ? null : _submit,
+          // Disabled while a picked file is being converted.
+          onPressed: _preparing > 0 ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),

@@ -1,14 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/features/billing/receipt_converter.dart';
-import 'package:m18_residences_admin/utils/pick_file.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 /// Names the apps show for the payment methods' ids.
 const paymentMethodLabels = {'bpi': 'BPI', 'gcash': 'GCash', 'maya': 'Maya'};
 
-/// A payment method's QR code: a preview, its storage key, View (with Save) and Replace.
+/// A payment method's QR code: a preview, View (with Save) and Replace.
 /// Replace picks an image, converts it to PNG in the browser and hands it to [onReplace].
 class PaymentCard extends StatefulWidget {
   final PaymentImage image;
@@ -67,7 +65,7 @@ class _PaymentCardState extends State<PaymentCard> {
     context,
     fetchFile: widget.fetchFile,
     subject: '$_label QR code',
-    fileName: widget.image.key,
+    fileName: '$_label QR code',
     saveName: '${widget.image.name}-qr',
   );
 
@@ -81,7 +79,6 @@ class _PaymentCardState extends State<PaymentCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            Text(widget.image.key, style: theme.textTheme.bodySmall),
             const SizedBox(height: 12),
             SizedBox(height: 200, child: Center(child: _preview())),
             const SizedBox(height: 12),

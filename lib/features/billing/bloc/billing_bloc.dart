@@ -14,6 +14,8 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<LoadBills>(_onLoadBills);
     on<AddBill>(_onAddBill);
     on<UpdateBill>(_onUpdateBill);
+    on<UploadPayment>(_onUploadPayment);
+    on<ClearPayment>(_onClearPayment);
     on<DeleteBill>(_onDeleteBill);
   }
 
@@ -48,8 +50,44 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
         return;
       }
     }
+    if (!await _uploadPayment(created.id, event.payment, emit, 'Bill created')) return;
     add(LoadBills());
     emit(AddSuccess());
+  }
+
+  /// Uploads [payment] (if any) to bill [id] after the bill itself was saved; on failure reloads, reports
+  /// "[saved], but the payment upload failed" and returns false.
+  Future<bool> _uploadPayment(int id, PreparedReceipt? payment, Emitter<BillingState> emit, String saved) async {
+    if (payment == null) return true;
+    try {
+      await billApi.uploadPayment(id, bytes: payment.bytes, filename: payment.filename, contentType: payment.contentType);
+      return true;
+    } catch (e) {
+      add(LoadBills());
+      emit(BillingActionFailed('$saved, but the payment upload failed: ${_reason(e)}'));
+      return false;
+    }
+  }
+
+  Future<void> _onUploadPayment(UploadPayment event, Emitter<BillingState> emit) async {
+    final payment = event.payment;
+    try {
+      await billApi.uploadPayment(event.id, bytes: payment.bytes, filename: payment.filename, contentType: payment.contentType);
+      add(LoadBills());
+      emit(PaymentSuccess('Payment attached'));
+    } catch (e) {
+      emit(BillingActionFailed('Failed to attach the payment: ${_reason(e)}'));
+    }
+  }
+
+  Future<void> _onClearPayment(ClearPayment event, Emitter<BillingState> emit) async {
+    try {
+      await billApi.clearPayment(event.id);
+      add(LoadBills());
+      emit(PaymentSuccess('Payment removed'));
+    } catch (e) {
+      emit(BillingActionFailed('Failed to remove the payment: ${_reason(e)}'));
+    }
   }
 
   Future<void> _onUpdateBill(UpdateBill event, Emitter<BillingState> emit) async {
@@ -60,11 +98,13 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       } else {
         await billApi.uploadReceipt(event.id, event.request, bytes: receipt.bytes, filename: receipt.filename, contentType: receipt.contentType);
       }
-      add(LoadBills());
-      emit(UpdateSuccess());
     } catch (e) {
       emit(BillingActionFailed('Failed to update bill: ${_reason(e)}'));
+      return;
     }
+    if (!await _uploadPayment(event.id, event.payment, emit, 'Bill updated')) return;
+    add(LoadBills());
+    emit(UpdateSuccess());
   }
 
   Future<void> _onDeleteBill(DeleteBill event, Emitter<BillingState> emit) async {

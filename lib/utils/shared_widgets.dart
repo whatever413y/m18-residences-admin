@@ -157,12 +157,17 @@ Widget buildFilterBar(BuildContext context, {required Widget room, required Widg
   );
 }
 
-/// Link to a bill's receipt, showing its whole storage key; the signed URL is fetched when it is opened.
-Widget buildReceipt(BuildContext context, String? tenantName, String? receiptUrl) {
-  return ReceiptLink(
+/// "View receipt" / "View payment" button for a bill's file (nothing when there is none); the signed URL is
+/// fetched when it is opened.
+Widget buildBillFile(BuildContext context, BillFileKind kind, String? tenantName, String? fileUrl) {
+  final authApi = context.read<AuthBloc>().authApi;
+  return BillFileButton(
+    kind: kind,
     tenantName: tenantName,
-    receiptUrl: receiptUrl,
-    fetchSignedFile: context.read<AuthBloc>().authApi.signedReceiptUrl,
-    showFullName: true,
+    fileUrl: fileUrl,
+    fetchSignedFile: switch (kind) {
+      BillFileKind.receipt => authApi.signedReceiptUrl,
+      BillFileKind.payment => authApi.signedTenantPaymentUrl,
+    },
   );
 }
