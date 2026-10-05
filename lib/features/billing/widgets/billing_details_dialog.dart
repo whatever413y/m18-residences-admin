@@ -86,7 +86,7 @@ class BillingDetailsDialog extends StatelessWidget {
       _spacer(),
       _buildDivider(),
       _spacer(),
-      _buildDetailRow('Total Amount', currencyFormat.format(bill.totalAmount)),
+      _buildDetailRow('Total Amount', currencyFormat.format(bill.totalAmount), semanticsId: 'bill-details-total'),
       _spacer(),
       _buildDetailRow('Date', date),
     ]);
@@ -94,8 +94,8 @@ class BillingDetailsDialog extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: detailRows);
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
+  Widget _buildDetailRow(String label, String value, {String? semanticsId}) {
+    final row = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -109,6 +109,7 @@ class BillingDetailsDialog extends StatelessWidget {
         ),
       ],
     );
+    return semanticsId == null ? row : Semantics(container: true, identifier: semanticsId, child: row);
   }
 
   void buildChargesDetails(List<Widget> detailRows, List<AdditionalCharge> charges) {
