@@ -12,8 +12,10 @@ browser (`lib/features/billing/receipt_converter.dart`): at most 1600 px on the 
 vendored [heic-to](web/vendor/heic-to/README.md) (LGPL-3.0), loaded only when a HEIC file is picked. PDFs are
 uploaded as-is. A receipt can be attached when generating the bill or later; replacing it deletes the old file.
 
-The file picker (`lib/utils/pick_file.dart`) treats only the browser's own cancel as a cancel: file_picker's default
-also gave up 500 ms after the dialog closed, which dropped large or not-yet-downloaded (OneDrive) photos.
+Files are picked with `lib/utils/pick_file.dart` (a plain file input, no plugin). Its input stays in the page until
+the pick ends: Safari on iPhone/iPad ignores picks on an input already removed (file_picker did that, so nothing
+happened there), and only the browser's own cancel counts as a cancel (file_picker also gave up 500 ms after the
+dialog closed, dropping large or OneDrive photos).
 
 ## Payment QR codes
 
