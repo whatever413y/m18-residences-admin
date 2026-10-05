@@ -103,7 +103,7 @@ class ReadingsPageState extends State<ReadingsPage> {
   }
 
   Future<void> _showReadingDialog(ReadingLoaded state, {Reading? reading}) async {
-    final result = await showDialog<ReadingRequest>(
+    final result = await showSelectableDialog<ReadingRequest>(
       context: context,
       builder: (context) => ReadingFormDialog(
         showActiveOnly: _showActiveOnly,
@@ -123,7 +123,7 @@ class ReadingsPageState extends State<ReadingsPage> {
   }
 
   void _showReadingDetailsDialog(Reading reading, _ReadingsView view) {
-    showDialog(
+    showSelectableDialog(
       context: context,
       builder: (context) => ReadingDetailsDialog(
         reading: reading,

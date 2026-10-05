@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 Future<bool> showConfirmationAction({
   required BuildContext context,
@@ -7,7 +8,7 @@ Future<bool> showConfirmationAction({
   required String confirmContent,
   required Future<void> Function() onConfirmed,
 }) async {
-  final confirmed = await showDialog<bool>(
+  final confirmed = await showSelectableDialog<bool>(
     context: context,
     builder: (_) => AlertDialog(
       title: Text(confirmTitle),

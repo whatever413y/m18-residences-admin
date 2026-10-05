@@ -38,7 +38,7 @@ class _TenantsPageState extends State<TenantsPage> {
   }
 
   Future<void> _showTenantDialog({Tenant? tenant, required List<Room> rooms, bool isEditing = false}) async {
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showSelectableDialog<Map<String, dynamic>?>(
       context: context,
       builder: (_) => TenantFormDialog(tenant: tenant, rooms: rooms, isEditing: isEditing),
     );

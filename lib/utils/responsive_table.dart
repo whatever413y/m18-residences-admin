@@ -27,6 +27,7 @@ List<T> sortItems<T>(List<T> items, TableColumn<T> column, {required bool ascend
 /// [items] (already sorted) as a sortable [DataTable] when at least [tableMinWidth] wide (so the table never
 /// scrolls sideways), and as cards otherwise: the [titleColumn] as the card's title, the other columns as
 /// label/value rows, sorted with a "Sort by" menu.
+/// Rows and cards aren't tappable, so their text can be selected and copied; a Details button opens [onTap].
 /// It scrolls itself and is always scrollable, so it works under a [RefreshIndicator].
 class ResponsiveTable<T> extends StatelessWidget {
   final List<T> items;
@@ -78,11 +79,7 @@ class ResponsiveTable<T> extends StatelessWidget {
               ),
           ],
           rows: [
-            for (final item in items)
-              DataRow(
-                onSelectChanged: (_) => onTap(item),
-                cells: [DataCell(actions(item)), for (final column in columns) DataCell(column.cell(item))],
-              ),
+            for (final item in items) DataRow(cells: [DataCell(_actions(item)), for (final column in columns) DataCell(column.cell(item))]),
           ],
         ),
       ),
@@ -99,45 +96,50 @@ class ResponsiveTable<T> extends StatelessWidget {
         final item = items[index - 1];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            onTap: () => onTap(item),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DefaultTextStyle.merge(
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          child: columns[titleColumn].cell(item),
-                        ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: DefaultTextStyle.merge(
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        child: columns[titleColumn].cell(item),
                       ),
-                      actions(item),
-                    ],
-                  ),
-                  for (final (i, column) in columns.indexed)
-                    if (i != titleColumn)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6, right: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(width: 128, child: Text(column.label, style: labelStyle)),
-                            Expanded(child: column.cell(item)),
-                          ],
-                        ),
+                    ),
+                    _actions(item),
+                  ],
+                ),
+                for (final (i, column) in columns.indexed)
+                  if (i != titleColumn)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, right: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(width: 128, child: Text(column.label, style: labelStyle)),
+                          Expanded(child: column.cell(item)),
+                        ],
                       ),
-                ],
-              ),
+                    ),
+              ],
             ),
           ),
         );
       },
     );
   }
+
+  /// The page's actions, after a Details button.
+  Widget _actions(T item) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      IconButton(tooltip: 'Details', icon: const Icon(Icons.info_outline), onPressed: () => onTap(item)),
+      actions(item),
+    ],
+  );
 
   Widget _sortBar(BuildContext context) {
     return Padding(

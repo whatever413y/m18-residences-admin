@@ -36,7 +36,7 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   Future<void> _showRoomDialog({Room? room}) async {
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showSelectableDialog<Map<String, dynamic>?>(
       context: context,
       builder: (_) => RoomFormDialog(room: room),
     );

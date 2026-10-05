@@ -26,7 +26,8 @@ picked image (HEIC included) to a PNG of at most 1024 px in the browser and uplo
 
 Bills and readings are a sortable table on tablets and desktops and sortable cards on phones
 (`lib/utils/responsive_table.dart`); their filters start at the current month. Picking a tenant sets the room only
-when generating a bill or adding a reading. Every text can be selected and copied.
+when generating a bill or adding a reading. A row's Details button opens it; rows aren't clickable, so any text (pages and
+dialogs, opened with `showSelectableDialog`) can be selected and copied.
 
 ## Getting started
 

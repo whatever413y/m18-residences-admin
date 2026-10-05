@@ -136,7 +136,7 @@ class BillingsPageState extends State<BillingsPage> {
   }
 
   Future<void> _showBillingDialog(BillingLoaded state, {Bill? bill}) async {
-    final result = await showDialog<BillFormResult>(
+    final result = await showSelectableDialog<BillFormResult>(
       context: context,
       builder: (context) => BillingFormDialog(
         showActiveOnly: _showActiveOnly,
@@ -165,7 +165,7 @@ class BillingsPageState extends State<BillingsPage> {
     final tenant = view.tenants[bill.tenantId];
     final room = view.rooms[_roomIdOf(bill, view.tenants)];
 
-    showDialog(
+    showSelectableDialog(
       context: context,
       builder: (_) => BillingDetailsDialog(
         bill: bill,
