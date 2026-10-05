@@ -1,7 +1,8 @@
 # M18 Residences — admin app
 
 The admin page of M18 Residences (https://admin.m18-residences.workers.dev): rooms, tenants, electricity readings,
-bills and payment receipts. Flutter web, hosted as a static-assets Cloudflare Worker (`admin`).
+bills and payment receipts. Flutter web, hosted as a static-assets Cloudflare Worker (`admin`). The production site
+is behind Cloudflare Access: log in with an allowed email (one-time code), then with the admin login.
 
 ## Receipts
 
@@ -42,8 +43,7 @@ Code layout is feature-first: `lib/features/<feature>/{bloc,widgets}/`.
 - `flutter analyze` must report no issues; `dart format lib` (150 columns).
 - `test.yml`: PRs to `main` → format, analyze, release build.
 - `preview.yml`: the same checks, then a **preview** on this app's Worker, built against the development API
-  (`development-api`, synthetic data) and behind Cloudflare Access (log in with an allowed email); production is
-  untouched:
+  (`development-api`, synthetic data; open, no Access); production is untouched:
   - pushes to `development` → https://development-admin.m18-residences.workers.dev
   - pull requests from this repo → `https://pr-<number>-admin.m18-residences.workers.dev`, linked in a PR comment
 - `deploy.yml`: pushes to `main` → the same checks → the browser e2e suite (`shared-e2e`) with this commit and
