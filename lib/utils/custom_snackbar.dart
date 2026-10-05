@@ -61,7 +61,8 @@ class CustomSnackbar {
       backgroundColor: colorMap[type],
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.all(16),
-      duration: type == SnackBarType.loading ? const Duration(hours: 1) : duration,
+      // A loading toast is replaced by the result's toast; the limit only guards against a result that never comes.
+      duration: type == SnackBarType.loading ? const Duration(seconds: 30) : duration,
       content: Row(
         children: [
           leading,

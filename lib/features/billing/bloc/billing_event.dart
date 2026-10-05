@@ -16,10 +16,13 @@ class LoadBills extends BillingEvent {}
 class AddBill extends BillingEvent {
   final BillRequest request;
 
-  const AddBill(this.request);
+  /// Receipt picked (and converted) in the form; uploaded to the new bill right after it is created.
+  final PreparedReceipt? receipt;
+
+  const AddBill(this.request, {this.receipt});
 
   @override
-  List<Object?> get props => [request];
+  List<Object?> get props => [request, receipt];
 }
 
 class UpdateBill extends BillingEvent {

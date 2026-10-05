@@ -28,10 +28,26 @@ class BillingLoaded extends BillingState {
   List<Object?> get props => [bills, rooms, tenants, readings];
 }
 
+/// Loading the billing data failed; the page shows the error instead of the bills.
 class BillingError extends BillingState {
   final String message;
   BillingError(this.message);
 
   @override
   List<Object?> get props => [message];
+}
+
+/// Creating, updating or deleting a bill failed; the page keeps showing the bills and reports [message].
+class BillingActionFailed extends BillingState {
+  static int _count = 0;
+
+  final String message;
+
+  /// Makes every failure a new state, so the same failure twice in a row is reported twice.
+  final int _id = _count++;
+
+  BillingActionFailed(this.message);
+
+  @override
+  List<Object?> get props => [message, _id];
 }

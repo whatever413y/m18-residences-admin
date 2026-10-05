@@ -27,9 +27,11 @@ Widget buildRoomFilter({
   required void Function(int? roomId, int? tenantId) onFilterChanged,
   String? label,
   String? semanticsId,
+  String? Function(int?)? validator,
 }) {
   return CustomDropdownForm<int>(
     label: label ?? 'Filter by Room',
+    validator: validator,
     semanticsId: semanticsId,
     items: [
       const DropdownMenuItem(value: null, child: Text('All Rooms')),
@@ -53,50 +55,46 @@ Widget buildRoomFilter({
   );
 }
 
+/// Tenant dropdown, listing the tenants of the selected room (all rooms when none is). Picking a tenant sets
+/// the room to theirs only with [autoSelectRoom] (when generating a bill or adding a reading). With [allLabel]
+/// (filters), the empty choice is selectable and means every tenant.
 Widget buildTenantFilter({
   required List<Tenant> tenants,
-  required List<Reading> readings,
   required int? selectedRoomId,
   required int? selectedTenantId,
   required bool showActiveOnly,
   required void Function(int? tenantId, int? roomId) onFilterChanged,
+  bool autoSelectRoom = false,
+  String? allLabel,
   String? label,
   String? semanticsId,
 }) {
   final filteredTenants = tenants.where((t) {
     final matchesRoom = selectedRoomId == null || t.roomId == selectedRoomId;
-    final matchesActive = !showActiveOnly || t.isActive;
+    final matchesActive = !showActiveOnly || t.isActive || t.id == selectedTenantId;
     return matchesRoom && matchesActive;
   }).toList();
 
   return CustomDropdownForm<int>(
     label: label ?? 'Filter by Tenant',
-    hint: 'Choose a tenant',
+    hint: allLabel ?? 'Choose a tenant',
     semanticsId: semanticsId,
     items: [
-      const DropdownMenuItem(value: null, enabled: false, child: Text('Choose a tenant')),
+      DropdownMenuItem(value: null, enabled: allLabel != null, child: Text(allLabel ?? 'Choose a tenant')),
       ...filteredTenants.map((tenant) => DropdownMenuItem(value: tenant.id, child: Text(tenant.name))),
     ],
     value: selectedTenantId,
-    onChanged: (value) {
-      int? newTenantId = value;
-      int? newRoomId = selectedRoomId;
-
-      if (newTenantId != null) {
-        final tenant = tenants.firstWhere((t) => t.id == newTenantId);
-        if (newRoomId != tenant.roomId) {
-          newRoomId = tenant.roomId;
-        }
-      }
-
-      onFilterChanged(newTenantId, newRoomId);
+    onChanged: (tenantId) {
+      final tenant = tenants.firstWhereOrNull((t) => t.id == tenantId);
+      onFilterChanged(tenantId, autoSelectRoom && tenant != null ? tenant.roomId : selectedRoomId);
     },
-    validator: (value) => value == null ? 'Please choose a tenant' : null,
+    validator: allLabel != null ? null : (value) => value == null ? 'Please choose a tenant' : null,
   );
 }
 
-Widget buildYearFilter({required List<Reading> readings, required int? selectedYear, required ValueChanged<int?> onYearChanged}) {
-  final years = readings.map((r) => r.createdAt.year).toSet().toList()..sort();
+/// Year filter over the years of [dates] plus the current one (newest first); "All Years" is null.
+Widget buildYearFilter({required Iterable<DateTime> dates, required int? selectedYear, required ValueChanged<int?> onYearChanged}) {
+  final years = {DateTime.now().year, ...dates.map((d) => d.year)}.toList()..sort((a, b) => b.compareTo(a));
 
   return CustomDropdownForm<int>(
     label: 'Filter by Year',
@@ -109,24 +107,62 @@ Widget buildYearFilter({required List<Reading> readings, required int? selectedY
   );
 }
 
-Widget buildMonthFilter({required List<Reading> readings, required int? selectedMonth, required ValueChanged<int?> onMonthChanged}) {
-  final months = readings.map((r) => r.createdAt.month).toSet().toList()..sort();
-
+/// Month filter (January to December); "All Months" is null.
+Widget buildMonthFilter({required int? selectedMonth, required ValueChanged<int?> onMonthChanged}) {
   return CustomDropdownForm<int>(
     label: 'Filter by Month',
     items: [
       const DropdownMenuItem(value: null, child: Text('All Months')),
-      ...months.map((month) {
-        final monthName = DateFormat.MMMM().format(DateTime(0, month));
-        return DropdownMenuItem(value: month, child: Text(monthName));
-      }),
+      for (var month = 1; month <= 12; month++) DropdownMenuItem(value: month, child: Text(DateFormat.MMMM().format(DateTime(0, month)))),
     ],
     value: selectedMonth,
     onChanged: onMonthChanged,
   );
 }
 
-/// Link to a bill's receipt image; the signed URL is fetched when it is opened.
+/// Room, tenant, year and month filters: two rows on phones, one row on wider screens.
+Widget buildFilterBar(BuildContext context, {required Widget room, required Widget tenant, required Widget year, required Widget month}) {
+  const gap = SizedBox(width: 12);
+  if (context.windowSize.isCompact) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: room),
+            gap,
+            Expanded(child: tenant),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: year),
+            gap,
+            Expanded(child: month),
+          ],
+        ),
+      ],
+    );
+  }
+  return Row(
+    children: [
+      Expanded(child: room),
+      gap,
+      Expanded(child: tenant),
+      gap,
+      Expanded(child: year),
+      gap,
+      Expanded(child: month),
+    ],
+  );
+}
+
+/// Link to a bill's receipt, showing its whole storage key; the signed URL is fetched when it is opened.
 Widget buildReceipt(BuildContext context, String? tenantName, String? receiptUrl) {
-  return ReceiptLink(tenantName: tenantName, receiptUrl: receiptUrl, fetchSignedFile: context.read<AuthBloc>().authApi.signedReceiptUrl);
+  return ReceiptLink(
+    tenantName: tenantName,
+    receiptUrl: receiptUrl,
+    fetchSignedFile: context.read<AuthBloc>().authApi.signedReceiptUrl,
+    showFullName: true,
+  );
 }

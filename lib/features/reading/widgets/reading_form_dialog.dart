@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -73,11 +74,11 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width * 0.6;
     return AlertDialog(
-      insetPadding: EdgeInsets.zero,
+      insetPadding: formDialogInset(context),
+      scrollable: true,
       title: Text(widget.reading == null ? 'Add New Reading' : 'Edit Reading'),
-      content: SizedBox(width: screenWidth, child: _buildContent()),
+      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
       actions: _buildActions(context, widget.reading != null),
     );
   }
@@ -126,6 +127,7 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
       tenants: widget.tenants,
       selectedRoomId: _selectedRoomId,
       selectedTenantId: _selectedTenantId,
+      validator: (roomId) => roomId == null ? 'Please choose a room' : null,
       onFilterChanged: (roomId, tenantId) {
         setState(() {
           _selectedRoomId = roomId;
@@ -141,10 +143,11 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
       label: 'Select Tenant',
       semanticsId: 'reading-tenant',
       tenants: widget.tenants,
-      readings: widget.readings,
       selectedRoomId: _selectedRoomId,
       selectedTenantId: _selectedTenantId,
       showActiveOnly: widget.showActiveOnly,
+      // Only a new reading takes the tenant's room; editing keeps the room chosen.
+      autoSelectRoom: widget.reading == null,
       onFilterChanged: (tenantId, roomId) {
         setState(() {
           _selectedTenantId = tenantId;
@@ -183,6 +186,7 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
       semanticsId: 'reading-curr',
       keyboardType: TextInputType.number,
       textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => _submit(),
       validator: (value) {
         final curr = int.tryParse(value ?? '');
         final prev = int.tryParse(prevController.text);
@@ -197,10 +201,16 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
     );
   }
 
-  void _submit() async {
+  void _submit() {
     if (_formKey.currentState?.validate() != true) return;
-    final prev = int.tryParse(prevController.text);
-    final curr = int.tryParse(currController.text);
-    Navigator.of(context).pop({'roomId': _selectedRoomId, 'tenantId': _selectedTenantId, 'prevReading': prev, 'currReading': curr});
+    // The validators ensure a room, a tenant and both readings.
+    Navigator.of(context).pop(
+      ReadingRequest(
+        roomId: _selectedRoomId!,
+        tenantId: _selectedTenantId!,
+        prevReading: int.parse(prevController.text),
+        currReading: int.parse(currController.text),
+      ),
+    );
   }
 }

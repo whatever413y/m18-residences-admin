@@ -1,15 +1,30 @@
 # M18 Residences — admin app
 
 The admin page of M18 Residences (https://admin.m18-residences.workers.dev): rooms, tenants, electricity readings,
-bills and payment receipts. Flutter web, hosted as a static-assets Cloudflare Worker (`admin`). The production site
+bills with their payment receipts, and the payment QR codes tenants pay with. Flutter web, hosted as a static-assets Cloudflare Worker (`admin`). The production site
 is behind Cloudflare Access: log in with an allowed email (one-time code), then with the admin login.
 
 ## Receipts
 
 Receipts can be JPEG, PNG, WebP, GIF, AVIF, HEIC/HEIF or PDF. Before uploading, the app converts images in the
 browser (`lib/features/billing/receipt_converter.dart`): at most 1600 px on the long edge, WebP at quality 0.8
-(JPEG if the browser can't write WebP), keeping the original when that is smaller. HEIC is decoded by the vendored
-[heic-to](web/vendor/heic-to/README.md) (LGPL-3.0), loaded only when a HEIC file is picked. PDFs are uploaded as-is.
+(JPEG if the browser can't write WebP; a WebP already smaller than its re-encoding is kept). HEIC is decoded by the
+vendored [heic-to](web/vendor/heic-to/README.md) (LGPL-3.0), loaded only when a HEIC file is picked. PDFs are
+uploaded as-is. A receipt can be attached when generating the bill or later; replacing it deletes the old file.
+
+The file picker (`lib/utils/pick_file.dart`) treats only the browser's own cancel as a cancel: file_picker's default
+also gave up 500 ms after the dialog closed, which dropped large or not-yet-downloaded (OneDrive) photos.
+
+## Payment QR codes
+
+"Payment QR Codes" shows the BPI, GCash and Maya QR images tenants see, with their storage keys. Replace converts the
+picked image (HEIC included) to a PNG of at most 1024 px in the browser and uploads it.
+
+## Lists
+
+Bills and readings are a sortable table on tablets and desktops and sortable cards on phones
+(`lib/utils/responsive_table.dart`); their filters start at the current month. Picking a tenant sets the room only
+when generating a bill or adding a reading. Every text can be selected and copied.
 
 ## Getting started
 

@@ -1,6 +1,10 @@
-import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
+
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:m18_residences_admin/features/billing/receipt_converter.dart';
+import 'package:m18_residences_admin/utils/form_dialog.dart';
+import 'package:m18_residences_admin/utils/pick_file.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -9,6 +13,14 @@ class AdditionalChargeInput {
   String description;
 
   AdditionalChargeInput({this.amount = 0, this.description = ''});
+}
+
+/// What the bill form returns: the bill to send, and the receipt picked for it (if any).
+class BillFormResult {
+  final BillRequest request;
+  final PreparedReceipt? receipt;
+
+  const BillFormResult(this.request, this.receipt);
 }
 
 class BillingFormDialog extends StatefulWidget {
@@ -55,6 +67,11 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   String? _receiptError;
   String? _receiptUrl;
 
+  /// Why the form can't be saved yet (shown above the buttons), e.g. a tenant without a reading.
+  String? _formError;
+
+  bool get _isEditing => widget.bill != null;
+
   @override
   void initState() {
     super.initState();
@@ -71,9 +88,9 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     _additionalDescControllers = _additionalCharges.map((e) => TextEditingController(text: e.description)).toList();
 
     if (bill != null) {
-      final tenant = widget.tenants.firstWhere((t) => t.id == bill.tenantId);
-      _selectedTenantId = tenant.id;
-      _selectedRoomId = tenant.roomId;
+      final tenant = widget.tenants.firstWhereOrNull((t) => t.id == bill.tenantId);
+      _selectedTenantId = bill.tenantId;
+      _selectedRoomId = tenant?.roomId;
       _selectedReadingId = bill.readingId;
       _roomChargesController.text = bill.roomCharges.toString();
       _electricChargesController.text = bill.electricCharges.toString();
@@ -108,29 +125,29 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   }
 
   Future<void> _pickReceiptFile() async {
-    final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: receiptExtensions);
-    // A cancelled picker clears a previously picked file.
-    if (file == null) {
-      setState(() {
-        _receipt = null;
-        _receiptError = null;
-      });
+    final ({String name, Uint8List bytes})? file;
+    try {
+      file = await pickFile(receiptExtensions);
+    } catch (e) {
+      setState(() => _receiptError = 'Could not open the file picker: $e');
       return;
     }
+    // Cancelling the picker keeps the receipt picked before (if any).
+    if (file == null || !mounted) return;
 
     setState(() {
       _preparingReceipt = true;
       _receiptError = null;
     });
     try {
-      final prepared = await prepareReceipt(file.name, await file.readAsBytes());
+      final prepared = await prepareReceipt(file.name, file.bytes);
       if (!mounted) return;
       setState(() => _receipt = prepared);
-    } on ReceiptException catch (e) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _receipt = null;
-        _receiptError = e.message;
+        _receiptError = e is ReceiptException ? e.message : 'Could not read the file: $e';
       });
     } finally {
       if (mounted) setState(() => _preparingReceipt = false);
@@ -181,6 +198,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   }
 
   void _updateCharges() {
+    _formError = null;
     if (_selectedRoomId == null || _selectedTenantId == null) {
       _roomChargesController.clear();
       _electricChargesController.clear();
@@ -201,43 +219,42 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     _electricChargesController.text = electricCharges.toString();
   }
 
-  void _submit() async {
+  void _submit() {
     if (_preparingReceipt) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final additionalCharges = <Map<String, dynamic>>[];
-
-    for (var i = 0; i < _additionalCharges.length; i++) {
-      final amountText = _additionalChargeControllers[i].text.trim();
-      final description = _additionalDescControllers[i].text.trim();
-
-      final amount = int.tryParse(amountText) ?? 0;
-
-      if (amount == 0 && description.isEmpty) continue;
-
-      additionalCharges.add({'amount': amount, 'description': description});
+    final tenantId = _selectedTenantId!;
+    final readingId = _selectedReadingId;
+    if (readingId == null) {
+      setState(() => _formError = 'This tenant has no reading in this room yet: add one under Electric Readings first.');
+      return;
     }
 
-    Navigator.of(context).pop({
-      'readingId': _selectedReadingId,
-      'tenantId': _selectedTenantId,
-      'roomCharges': int.tryParse(_roomChargesController.text) ?? 0,
-      'electricCharges': int.tryParse(_electricChargesController.text) ?? 0,
-      'additionalCharges': additionalCharges,
-      'receipt': _receipt,
-      'receiptUrl': _receiptUrl,
-    });
+    final additionalCharges = <AdditionalCharge>[];
+    for (var i = 0; i < _additionalCharges.length; i++) {
+      final amount = int.tryParse(_additionalChargeControllers[i].text.trim()) ?? 0;
+      final description = _additionalDescControllers[i].text.trim();
+      if (amount == 0 && description.isEmpty) continue;
+      additionalCharges.add(AdditionalCharge(amount: amount, description: description));
+    }
+
+    final request = BillRequest(
+      tenantId: tenantId,
+      readingId: readingId,
+      roomCharges: int.tryParse(_roomChargesController.text) ?? 0,
+      electricCharges: int.tryParse(_electricChargesController.text) ?? 0,
+      additionalCharges: additionalCharges,
+      receiptUrl: _receiptUrl,
+    );
+    Navigator.of(context).pop(BillFormResult(request, _receipt));
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width * 0.6;
-
     return AlertDialog(
-      insetPadding: EdgeInsets.zero,
-      title: Text(widget.bill == null ? 'Generate Bill' : 'Update Bill'),
-      content: SizedBox(width: screenWidth, child: _buildContent()),
-      actions: _buildActions(context, widget.bill != null),
+      insetPadding: formDialogInset(context),
+      title: Text(_isEditing ? 'Update Bill' : 'Generate Bill'),
+      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+      actions: _buildActions(context),
     );
   }
 
@@ -259,7 +276,12 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
             const SizedBox(height: 16),
             _buildAdditionalChargesList(),
             const SizedBox(height: 16),
-            if (widget.bill != null) _buildUploadButton(),
+            _buildUploadButton(),
+            if (_formError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              ),
           ],
         ),
       ),
@@ -273,7 +295,8 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       : '${receipt.filename} · ${_size(receipt.bytes.length)}';
 
   Widget _buildUploadButton() {
-    final tenantName = _selectedTenantId != null ? widget.tenants.firstWhere((t) => t.id == _selectedTenantId!).name : '';
+    final tenantName = widget.tenants.firstWhereOrNull((t) => t.id == _selectedTenantId)?.name;
+    final hasReceipt = _receipt != null || (_receiptUrl?.isNotEmpty ?? false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,22 +304,21 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
         Semantics(
           identifier: 'bill-attach-receipt',
           child: ElevatedButton.icon(
-            onPressed: _preparingReceipt
-                ? null
-                : () {
-                    Future.microtask(() async {
-                      await _pickReceiptFile();
-                    });
-                  },
-            icon: Icon(Icons.attach_file),
-            label: Text((_receipt == null && (_receiptUrl == null || _receiptUrl!.isEmpty)) ? 'Attach Receipt' : 'Change Receipt'),
+            onPressed: _preparingReceipt ? null : _pickReceiptFile,
+            icon: const Icon(Icons.attach_file),
+            label: Text(hasReceipt ? 'Change Receipt' : 'Attach Receipt'),
           ),
         ),
-
         if (_preparingReceipt)
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Text('Preparing receipt...', style: TextStyle(fontStyle: FontStyle.italic)),
+            child: Row(
+              children: [
+                SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 8),
+                Text('Preparing receipt...', style: TextStyle(fontStyle: FontStyle.italic)),
+              ],
+            ),
           )
         else if (_receiptError != null)
           Padding(
@@ -312,206 +334,135 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
               child: Text(_receiptLabel(_receipt!), style: const TextStyle(fontStyle: FontStyle.italic)),
             ),
           )
-        else if (_receiptUrl != null && _receiptUrl!.isNotEmpty && _selectedTenantId != null)
-          buildReceipt(context, tenantName, _receiptUrl!),
+        else if (_receiptUrl?.isNotEmpty ?? false)
+          buildReceipt(context, tenantName, _receiptUrl),
       ],
     );
   }
 
-  Widget _buildAdditionalChargesList() {
-    final isWide = MediaQuery.of(context).size.width > 600;
+  /// An additional charge's amount; negative amounts are discounts.
+  String? _validateAmount(int index, String? value) {
+    final amount = int.tryParse(value?.trim() ?? '');
+    final description = _additionalDescControllers[index].text.trim();
+    if ((value?.trim().isNotEmpty ?? false) && amount == null) return 'Enter a whole number';
+    if (description.isNotEmpty && (amount ?? 0) == 0) return 'Please fill in an amount';
+    if ((amount ?? 0) != 0 && description.isEmpty) return 'Description is required';
+    return null;
+  }
 
-    return Column(
-      children: [
-        ...List.generate(_additionalCharges.length, (index) {
-          final fields = [
-            Expanded(
-              flex: 3,
-              child: CustomTextFormField(
+  String? _validateDescription(int index, String? value) {
+    final description = value?.trim() ?? '';
+    final amount = int.tryParse(_additionalChargeControllers[index].text.trim()) ?? 0;
+    if (description.isNotEmpty && amount == 0) return 'Please fill in an amount';
+    if (amount != 0 && description.isEmpty) return 'Description is required';
+    if (description.length > 200) return 'Description too long';
+    return null;
+  }
+
+  void _removeCharge(int index) {
+    setState(() {
+      _additionalCharges.removeAt(index);
+      _additionalChargeControllers[index].dispose();
+      _additionalDescControllers[index].dispose();
+      _additionalChargeControllers.removeAt(index);
+      _additionalDescControllers.removeAt(index);
+    });
+  }
+
+  Widget _peso() => Padding(
+    padding: const EdgeInsets.all(12.0),
+    child: Text(
+      '₱',
+      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
+    ),
+  );
+
+  Widget _buildAdditionalChargesList() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Side by side when the dialog (not the window) has room for both fields.
+        final sideBySide = constraints.maxWidth >= 420;
+
+        return Column(
+          children: [
+            ...List.generate(_additionalCharges.length, (index) {
+              final amount = CustomTextFormField(
                 controller: _additionalChargeControllers[index],
                 labelText: 'Additional Charge',
                 semanticsId: 'bill-charge-amount-$index',
-                keyboardType: const TextInputType.numberWithOptions(signed: false),
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(
-                    '₱',
-                    style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                validator: (value) {
-                  final amount = int.tryParse(value ?? '') ?? 0;
-                  final description = _additionalDescControllers[index].text.trim();
-
-                  if (description.isNotEmpty && amount == 0) {
-                    return 'Please fill in an amount';
-                  }
-
-                  if (amount != 0 && description.isEmpty) {
-                    return 'Description is required';
-                  }
-
-                  return null;
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 6,
-              child: CustomTextFormField(
+                keyboardType: const TextInputType.numberWithOptions(signed: true),
+                prefixIcon: _peso(),
+                validator: (value) => _validateAmount(index, value),
+                onFieldSubmitted: (_) => _submit(),
+              );
+              final description = CustomTextFormField(
                 controller: _additionalDescControllers[index],
                 labelText: 'Description',
                 semanticsId: 'bill-charge-description-$index',
-                keyboardType: TextInputType.text,
-                validator: (value) {
-                  final description = value?.trim() ?? '';
-                  final amount = int.tryParse(_additionalChargeControllers[index].text) ?? 0;
+                validator: (value) => _validateDescription(index, value),
+                onFieldSubmitted: (_) => _submit(),
+              );
+              final remove = _additionalCharges.length > 1
+                  ? IconButton(
+                      tooltip: 'Remove charge',
+                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                      onPressed: () => _removeCharge(index),
+                    )
+                  : null;
 
-                  if (description.isNotEmpty && amount == 0) {
-                    return 'Please fill in an amount';
-                  }
-
-                  if (amount != 0 && description.isEmpty) {
-                    return 'Description is required';
-                  }
-
-                  if (description.length > 200) {
-                    return 'Description too long';
-                  }
-
-                  return null;
-                },
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: sideBySide
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 3, child: amount),
+                          const SizedBox(width: 16),
+                          Expanded(flex: 6, child: description),
+                          if (remove != null) ...[const SizedBox(width: 8), remove],
+                        ],
+                      )
+                    : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [amount, const SizedBox(height: 12), description, ?remove]),
+              );
+            }),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                container: true,
+                identifier: 'bill-add-charge',
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _additionalCharges.add(AdditionalChargeInput());
+                      _additionalChargeControllers.add(TextEditingController());
+                      _additionalDescControllers.add(TextEditingController());
+                    });
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Additional Charge'),
+                ),
               ),
             ),
-
-            const SizedBox(width: 8),
-            if (_additionalCharges.length > 1)
-              IconButton(
-                icon: const Icon(Icons.remove_circle, color: Colors.red),
-                onPressed: () {
-                  setState(() {
-                    _additionalCharges.removeAt(index);
-                    _additionalChargeControllers[index].dispose();
-                    _additionalDescControllers[index].dispose();
-                    _additionalChargeControllers.removeAt(index);
-                    _additionalDescControllers.removeAt(index);
-                  });
-                },
-              ),
-          ];
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: isWide
-                ? Row(children: fields)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CustomTextFormField(
-                        controller: _additionalChargeControllers[index],
-                        labelText: 'Additional Charge',
-                        semanticsId: 'bill-charge-amount-$index',
-                        keyboardType: const TextInputType.numberWithOptions(signed: false),
-                        prefixIcon: Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Text(
-                            '₱',
-                            style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        validator: (value) {
-                          final amount = int.tryParse(value ?? '') ?? 0;
-                          final description = _additionalDescControllers[index].text.trim();
-
-                          if (amount < 0) {
-                            return 'Enter a valid number';
-                          }
-                          if (amount > 0 && description.isEmpty) {
-                            return 'Description is required';
-                          }
-                          if (description.isNotEmpty && amount <= 0) {
-                            return 'Please fill in an amount';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      CustomTextFormField(
-                        controller: _additionalDescControllers[index],
-                        labelText: 'Description',
-                        semanticsId: 'bill-charge-description-$index',
-                        keyboardType: TextInputType.text,
-                        validator: (value) {
-                          final description = value?.trim() ?? '';
-                          final amount = int.tryParse(_additionalChargeControllers[index].text) ?? 0;
-
-                          if (description.isNotEmpty && amount <= 0) {
-                            return 'Please fill in an amount';
-                          }
-                          if (amount > 0 && description.isEmpty) {
-                            return 'Description is required';
-                          }
-                          if (description.length > 200) {
-                            return 'Description too long';
-                          }
-                          return null;
-                        },
-                      ),
-                      if (_additionalCharges.length > 1)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            icon: const Icon(Icons.remove_circle, color: Colors.red),
-                            onPressed: () {
-                              setState(() {
-                                _additionalCharges.removeAt(index);
-                                _additionalChargeControllers[index].dispose();
-                                _additionalDescControllers[index].dispose();
-                                _additionalChargeControllers.removeAt(index);
-                                _additionalDescControllers.removeAt(index);
-                              });
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-          );
-        }),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Semantics(
-            container: true,
-            identifier: 'bill-add-charge',
-            child: TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _additionalCharges.add(AdditionalChargeInput());
-                  _additionalChargeControllers.add(TextEditingController());
-                  _additionalDescControllers.add(TextEditingController());
-                });
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Additional Charge'),
-            ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
-  List<Widget> _buildActions(BuildContext context, bool isEditing) {
+  List<Widget> _buildActions(BuildContext context) {
     return [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       Semantics(
         container: true,
         identifier: 'bill-save',
         child: ElevatedButton(
-          onPressed: _submit,
+          // Disabled while the picked receipt is being converted.
+          onPressed: _preparingReceipt ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: Theme.of(context).primaryColor,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           ),
-          child: Text(widget.bill == null ? 'Generate Bill' : 'Update Bill'),
+          child: Text(_isEditing ? 'Update Bill' : 'Generate Bill'),
         ),
       ),
     ];
@@ -519,6 +470,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
 
   Widget _buildRoomDropdown() {
     return buildRoomFilter(
+      label: 'Room',
       rooms: widget.rooms,
       tenants: widget.tenants,
       selectedRoomId: _selectedRoomId,
@@ -538,10 +490,11 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       label: 'Select Tenant',
       semanticsId: 'bill-tenant',
       tenants: widget.tenants,
-      readings: widget.readings,
       selectedRoomId: _selectedRoomId,
       selectedTenantId: _selectedTenantId,
       showActiveOnly: widget.showActiveOnly,
+      // Only a new bill takes the tenant's room; editing keeps the room chosen.
+      autoSelectRoom: !_isEditing,
       onFilterChanged: (tenantId, roomId) {
         setState(() {
           _selectedTenantId = tenantId;
@@ -558,55 +511,34 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       labelText: 'Room Charges',
       semanticsId: 'bill-room-charges',
       enabled: false,
-      prefixIcon: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Text(
-          '₱',
-          style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-      ),
+      prefixIcon: _peso(),
     );
   }
 
   Widget _buildElectricChargesField() {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           flex: 3,
-          child: CustomTextFormField(
-            controller: _electricChargesController,
-            labelText: 'Electric Charges',
-            enabled: false,
-            prefixIcon: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Text(
-                '₱',
-                style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
+          child: CustomTextFormField(controller: _electricChargesController, labelText: 'Electric Charges', enabled: false, prefixIcon: _peso()),
         ),
         const SizedBox(width: 12),
         Expanded(
           flex: 2,
           child: CustomTextFormField(
             controller: _electricityRateController,
-            labelText: 'Electricity Rate',
+            labelText: 'Rate',
             semanticsId: 'bill-rate',
             keyboardType: const TextInputType.numberWithOptions(signed: false),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Text(
-                '₱',
-                style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
+            prefixIcon: _peso(),
             validator: (value) {
               final rate = int.tryParse(value ?? '') ?? 0;
               if (rate < 0) return 'Enter a valid number';
               return null;
             },
-            onChanged: (_) => _updateCharges(),
+            onChanged: (_) => setState(_updateCharges),
+            onFieldSubmitted: (_) => _submit(),
           ),
         ),
       ],

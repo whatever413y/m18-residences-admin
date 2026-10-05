@@ -43,7 +43,8 @@ class ReceiptException implements Exception {
 }
 
 /// Prepares a picked receipt for upload: images (including HEIC) are shrunk and re-encoded as WebP
-/// (JPEG where the browser can't write WebP), keeping the original if that is smaller; PDFs are kept as they are.
+/// (JPEG where the browser can't write WebP); a WebP already smaller than its re-encoding is kept as it is.
+/// PDFs are kept as they are.
 Future<PreparedReceipt> prepareReceipt(String filename, Uint8List bytes) async {
   final type = sniffReceiptType(bytes);
   if (type == null) {
@@ -56,16 +57,35 @@ Future<PreparedReceipt> prepareReceipt(String filename, Uint8List bytes) async {
   }
 
   final bitmap = type == 'image/heic' ? await _decodeHeic(bytes) : await _decode(bytes, type);
-  final (encoded, encodedType) = await _encode(bitmap);
+  final (encoded, encodedType) = await _encode(bitmap, maxEdge: _maxEdge, type: 'image/webp');
 
-  // A small image can already be smaller than its re-encoding; HEIC must be converted (browsers can't show it).
-  if (type != 'image/heic' && bytes.length <= encoded.length) {
+  // Re-encoding a small WebP can only make it bigger (and blurrier).
+  if (type == 'image/webp' && bytes.length <= encoded.length) {
     if (bytes.length > maxReceiptBytes) throw const ReceiptException('The image is larger than 10 MB');
     return PreparedReceipt(bytes: bytes, filename: filename, contentType: type, originalSize: bytes.length);
   }
   if (encoded.length > maxReceiptBytes) throw const ReceiptException('The image is still larger than 10 MB after shrinking it');
   final extension = encodedType == 'image/webp' ? 'webp' : 'jpg';
   return PreparedReceipt(bytes: encoded, filename: '${_baseName(filename)}.$extension', contentType: encodedType, originalSize: bytes.length);
+}
+
+/// Payment QR images are shrunk to at most this many pixels on their long edge.
+const _qrMaxEdge = 1024;
+
+/// The server refuses payment images over 2 MiB.
+const maxQrBytes = 2 * 1024 * 1024;
+
+/// Prepares a picked payment QR image for upload: decoded by the browser (HEIC too), shrunk to at most
+/// [_qrMaxEdge] px and encoded as PNG, which keeps a QR code's edges sharp.
+Future<Uint8List> prepareQrPng(Uint8List bytes) async {
+  final type = sniffReceiptType(bytes);
+  if (type == null || type == 'application/pdf') {
+    throw const ReceiptException('Unsupported file: pick an image (JPEG, PNG, WebP, GIF, AVIF, HEIC)');
+  }
+  final bitmap = type == 'image/heic' ? await _decodeHeic(bytes) : await _decode(bytes, type);
+  final (encoded, _) = await _encode(bitmap, maxEdge: _qrMaxEdge, type: 'image/png');
+  if (encoded.length > maxQrBytes) throw const ReceiptException('The QR image is still larger than 2 MB as PNG; crop it to the QR code');
+  return encoded;
 }
 
 /// A file's real type from its first bytes (the same rules as the server), or `null` if it isn't a receipt type.
@@ -138,9 +158,10 @@ Future<void> _loadHeicDecoder() {
   }();
 }
 
-/// Draws [bitmap] at most [_maxEdge] px on its long edge and encodes it as WebP, or JPEG where WebP isn't supported.
-Future<(Uint8List, String)> _encode(web.ImageBitmap bitmap) async {
-  final scale = math.min(1.0, _maxEdge / math.max(bitmap.width, bitmap.height));
+/// Draws [bitmap] at most [maxEdge] px on its long edge and encodes it as [type]; WebP falls back to JPEG
+/// where the browser can't write WebP.
+Future<(Uint8List, String)> _encode(web.ImageBitmap bitmap, {required int maxEdge, required String type}) async {
+  final scale = math.min(1.0, maxEdge / math.max(bitmap.width, bitmap.height));
   final width = math.max(1, (bitmap.width * scale).round());
   final height = math.max(1, (bitmap.height * scale).round());
   final canvas = web.OffscreenCanvas(width, height);
@@ -148,9 +169,9 @@ Future<(Uint8List, String)> _encode(web.ImageBitmap bitmap) async {
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
 
-  var blob = await canvas.convertToBlob(web.ImageEncodeOptions(type: 'image/webp', quality: _quality)).toDart;
+  var blob = await canvas.convertToBlob(web.ImageEncodeOptions(type: type, quality: _quality)).toDart;
   // Browsers that can't write WebP silently return PNG instead.
-  if (blob.type != 'image/webp') {
+  if (type == 'image/webp' && blob.type != 'image/webp') {
     blob = await canvas.convertToBlob(web.ImageEncodeOptions(type: 'image/jpeg', quality: _quality)).toDart;
   }
   final bytes = (await blob.arrayBuffer().toDart).toDart.asUint8List();

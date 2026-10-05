@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class TenantFormDialog extends StatefulWidget {
@@ -52,11 +53,11 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.tenant != null;
-    final screenWidth = MediaQuery.of(context).size.width * 0.3;
     return AlertDialog(
-      insetPadding: EdgeInsets.zero,
+      insetPadding: formDialogInset(context),
+      scrollable: true,
       title: _buildTitle(isEditing),
-      content: SizedBox(width: screenWidth, child: _buildContent()),
+      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
       actions: _buildActions(context, isEditing),
     );
   }
@@ -100,8 +101,8 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
       controller: _nameController,
       labelText: 'Tenant',
       semanticsId: 'tenant-name',
-      textInputAction: TextInputAction.next,
       validator: (value) => (value == null || value.trim().isEmpty) ? 'Enter tenant' : null,
+      onFieldSubmitted: (_) => _submit(),
       prefixIcon: Icon(Icons.person, color: Theme.of(context).primaryColor),
     );
   }

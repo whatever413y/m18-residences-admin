@@ -103,10 +103,7 @@ class _TenantsPageState extends State<TenantsPage> {
                 buildActiveToggleFilter(
                   showActiveOnly: _showActiveOnly,
                   onChanged: (val) {
-                    setState(() {
-                      _showActiveOnly = val;
-                      tenantBloc.add(LoadTenants());
-                    });
+                    setState(() => _showActiveOnly = val);
                   },
                 ),
                 const SizedBox(width: 8),
@@ -114,8 +111,11 @@ class _TenantsPageState extends State<TenantsPage> {
             ),
             body: BlocListener<TenantBloc, TenantState>(
               listener: (context, state) {
-                if (state is TenantError) {
-                  CustomSnackbar.show(context, state.message, type: SnackBarType.error);
+                if (state is TenantActionFailed) {
+                  CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+                } else if (state is TenantError) {
+                  // A failed load may mean the session expired; the auth check then shows the login error.
+                  authBloc.add(CheckAuthStatus());
                 } else if (state is AddSuccess) {
                   CustomSnackbar.show(context, 'Tenant created', type: SnackBarType.success);
                 } else if (state is UpdateSuccess) {
@@ -125,13 +125,14 @@ class _TenantsPageState extends State<TenantsPage> {
                 }
               },
               child: BlocBuilder<TenantBloc, TenantState>(
+                // Only data loads change what the page shows; action results are reported by the listener.
+                buildWhen: (_, state) => state is TenantInitial || state is TenantLoading || state is TenantLoaded || state is TenantError,
                 builder: (context, state) {
                   if (state is TenantLoading || state is TenantInitial) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
                   if (state is TenantError) {
-                    authBloc.add(CheckAuthStatus());
                     return ErrorView(message: state.message, onRetry: () => tenantBloc.add(LoadTenants()));
                   }
 
@@ -165,61 +166,55 @@ class _TenantsPageState extends State<TenantsPage> {
 
     final filteredTenants = _showActiveOnly ? tenants.where((tenant) => tenant.isActive).toList() : tenants;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        final isWide = screenWidth > 600;
-        final maxWidth = screenWidth * 0.95;
+    return ResponsiveCenter(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            tenantBloc.add(LoadTenants());
+            await tenantBloc.stream.firstWhere((state) => state is! TenantLoading);
+          },
+          child: !context.windowSize.isCompact
+              ? GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  // A fixed height that fits the card (two icon buttons), whatever the column width.
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 400,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    mainAxisExtent: 160,
+                  ),
+                  itemCount: filteredTenants.length,
+                  itemBuilder: (context, index) {
+                    final tenant = filteredTenants[index];
+                    final room = rooms.firstWhere((r) => r.id == tenant.roomId, orElse: () => Room(id: -1, name: 'Unknown', rent: 0));
 
-        return Center(
-          child: Container(
-            width: maxWidth,
-            padding: const EdgeInsets.all(16),
-            child: RefreshIndicator(
-              onRefresh: () async {
-                tenantBloc.add(LoadTenants());
-                await tenantBloc.stream.firstWhere((state) => state is! TenantLoading);
-              },
-              child: isWide
-                  ? GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 400,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 3 / 1.5,
-                      ),
-                      itemCount: filteredTenants.length,
-                      itemBuilder: (context, index) {
-                        final tenant = filteredTenants[index];
-                        final room = rooms.firstWhere((r) => r.id == tenant.roomId, orElse: () => Room(id: -1, name: 'Unknown', rent: 0));
+                    return TenantCard(
+                      tenant: tenant,
+                      room: room,
+                      onEdit: () => _showTenantDialog(tenant: tenant, rooms: rooms, isEditing: true),
+                      onDelete: () => _confirmDelete(tenant),
+                    );
+                  },
+                )
+              : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: filteredTenants.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final tenant = filteredTenants[index];
+                    final room = rooms.firstWhere((r) => r.id == tenant.roomId, orElse: () => Room(id: -1, name: 'Unknown', rent: 0));
 
-                        return TenantCard(
-                          tenant: tenant,
-                          room: room,
-                          onEdit: () => _showTenantDialog(tenant: tenant, rooms: rooms, isEditing: true),
-                          onDelete: () => _confirmDelete(tenant),
-                        );
-                      },
-                    )
-                  : ListView.separated(
-                      itemCount: filteredTenants.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 16),
-                      itemBuilder: (context, index) {
-                        final tenant = filteredTenants[index];
-                        final room = rooms.firstWhere((r) => r.id == tenant.roomId, orElse: () => Room(id: -1, name: 'Unknown', rent: 0));
-
-                        return TenantCard(
-                          tenant: tenant,
-                          room: room,
-                          onEdit: () => _showTenantDialog(tenant: tenant, rooms: rooms, isEditing: true),
-                          onDelete: () => _confirmDelete(tenant),
-                        );
-                      },
-                    ),
-            ),
-          ),
-        );
-      },
+                    return TenantCard(
+                      tenant: tenant,
+                      room: room,
+                      onEdit: () => _showTenantDialog(tenant: tenant, rooms: rooms, isEditing: true),
+                      onDelete: () => _confirmDelete(tenant),
+                    );
+                  },
+                ),
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_bloc.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_event.dart';
+import 'package:m18_residences_admin/features/payments/bloc/payment_bloc.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_bloc.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_event.dart';
 import 'package:m18_residences_admin/features/room/bloc/room_bloc.dart';
@@ -15,6 +16,7 @@ import 'package:m18_residences_shared/m18_residences_shared.dart';
 final ApiClient _apiClient = ApiClient(tokens: const TokenStore('admin_id'));
 final AuthApi _authApi = AuthApi(_apiClient);
 final BillApi _billApi = BillApi(_apiClient);
+final PaymentApi _paymentApi = PaymentApi(_apiClient);
 final ReadingApi _readingApi = ReadingApi(_apiClient);
 final RoomApi _roomApi = RoomApi(_apiClient);
 final TenantApi _tenantApi = TenantApi(_apiClient);
@@ -31,4 +33,6 @@ final List<BlocProvider> blocProviders = [
   BlocProvider<BillingBloc>(
     create: (_) => BillingBloc(readingApi: _readingApi, roomApi: _roomApi, tenantApi: _tenantApi, billApi: _billApi)..add(LoadBills()),
   ),
+  // Loads when the Payments page opens.
+  BlocProvider<PaymentBloc>(create: (_) => PaymentBloc(_paymentApi)),
 ];

@@ -27,6 +27,7 @@ class ReadingLoaded extends ReadingState {
   List<Object?> get props => [readings, rooms, tenants];
 }
 
+/// Loading the readings failed; the page shows the error instead of the readings.
 class ReadingError extends ReadingState {
   final String message;
 
@@ -34,4 +35,19 @@ class ReadingError extends ReadingState {
 
   @override
   List<Object?> get props => [message];
+}
+
+/// Creating, updating or deleting a reading failed; the page keeps showing the readings and reports [message].
+class ReadingActionFailed extends ReadingState {
+  static int _count = 0;
+
+  final String message;
+
+  /// Makes every failure a new state, so the same failure twice in a row is reported twice.
+  final int _id = _count++;
+
+  ReadingActionFailed(this.message);
+
+  @override
+  List<Object?> get props => [message, _id];
 }

@@ -144,6 +144,9 @@ class LoginPageState extends State<LoginPage> {
       controller: _usernameController,
       labelText: 'Username',
       semanticsId: 'admin-username',
+      autofocus: true,
+      // Enter moves on to the password field.
+      textInputAction: TextInputAction.next,
       prefixIcon: Icon(Icons.person, color: primaryColor),
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
@@ -161,6 +164,7 @@ class LoginPageState extends State<LoginPage> {
       semanticsId: 'admin-password',
       prefixIcon: Icon(Icons.lock, color: primaryColor),
       obscureText: _obscurePassword,
+      onFieldSubmitted: (_) => _submitLogin(),
       suffixIcon: IconButton(
         icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: primaryColor),
         onPressed: _togglePasswordVisibility,

@@ -34,3 +34,18 @@ class TenantError extends TenantState {
   @override
   List<Object?> get props => [message];
 }
+
+/// Creating, updating or deleting a tenant failed; the page keeps showing the tenants and reports [message].
+class TenantActionFailed extends TenantState {
+  static int _count = 0;
+
+  final String message;
+
+  /// Makes every failure a new state, so the same failure twice in a row is reported twice.
+  final int _id = _count++;
+
+  TenantActionFailed(this.message);
+
+  @override
+  List<Object?> get props => [message, _id];
+}

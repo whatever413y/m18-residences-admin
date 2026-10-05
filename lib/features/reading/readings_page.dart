@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:collection/collection.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/auth/auth_state.dart';
@@ -15,6 +14,7 @@ import 'package:m18_residences_admin/features/reading/widgets/reading_form_dialo
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_add_button.dart';
 import 'package:m18_residences_admin/utils/custom_snackbar.dart';
+import 'package:m18_residences_admin/utils/responsive_table.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -25,43 +25,76 @@ class ReadingsPage extends StatefulWidget {
   ReadingsPageState createState() => ReadingsPageState();
 }
 
+/// The loaded data indexed by id, and the readings shown for the current filters and sort.
+class _ReadingsView {
+  final ReadingLoaded state;
+  final Object settings;
+  final Map<int, Tenant> tenants;
+  final Map<int, Room> rooms;
+  final List<TableColumn<Reading>> columns;
+  final List<Reading> readings;
+
+  const _ReadingsView(this.state, this.settings, this.tenants, this.rooms, this.columns, this.readings);
+}
+
 class ReadingsPageState extends State<ReadingsPage> {
-  late AuthBloc authBloc;
-  late ReadingBloc readingBloc;
-  final DateFormat _dateFormat = DateFormat('MMM d, yyyy');
+  static final _dateFormat = DateFormat('MMM d, yyyy');
+
+  /// Index of the Date column in [_columns], the default sort (newest first).
+  static const _dateColumn = 4;
+
+  late final ReadingBloc readingBloc = context.read<ReadingBloc>();
   bool _showActiveOnly = true;
 
   int? _filterRoomId;
   int? _filterTenantId;
-  int? _filterYear;
-  int? _filterMonth;
+  int? _filterYear = DateTime.now().year;
+  int? _filterMonth = DateTime.now().month;
+  int _sortColumn = _dateColumn;
+  bool _sortAscending = false;
+
+  /// Recomputed only when the data, the filters or the sort change, not on every build.
+  _ReadingsView? _view;
 
   @override
   void initState() {
     super.initState();
-    authBloc = context.read<AuthBloc>();
-    authBloc.add(CheckAuthStatus());
-    readingBloc = context.read<ReadingBloc>();
+    context.read<AuthBloc>().add(CheckAuthStatus());
     readingBloc.add(LoadReadings());
   }
 
-  List<Reading> _applyFilters(List<Reading> readings, int? filterRoomId, int? filterYear, int? filterMonth, int? filterTenantId) {
-    return readings.where((r) {
-      final matchRoom = filterRoomId == null || r.roomId == filterRoomId;
-      final matchYear = filterYear == null || r.createdAt.year == filterYear;
-      final matchMonth = filterMonth == null || r.createdAt.month == filterMonth;
-      final matchTenant = filterTenantId == null || r.tenantId == filterTenantId;
-      return matchRoom && matchYear && matchMonth && matchTenant;
+  _ReadingsView _viewOf(ReadingLoaded state) {
+    final settings = (_showActiveOnly, _filterRoomId, _filterTenantId, _filterYear, _filterMonth, _sortColumn, _sortAscending);
+    final cached = _view;
+    if (cached != null && identical(cached.state, state) && cached.settings == settings) return cached;
+
+    final tenants = {for (final t in state.tenants) t.id: t};
+    final rooms = {for (final r in state.rooms) r.id: r};
+    final columns = _columns(tenants, rooms);
+    final shown = state.readings.where((reading) {
+      if (_showActiveOnly && !(tenants[reading.tenantId]?.isActive ?? false)) return false;
+      if (_filterRoomId != null && reading.roomId != _filterRoomId) return false;
+      if (_filterTenantId != null && reading.tenantId != _filterTenantId) return false;
+      if (_filterYear != null && reading.createdAt.year != _filterYear) return false;
+      if (_filterMonth != null && reading.createdAt.month != _filterMonth) return false;
+      return true;
     }).toList();
+    return _view = _ReadingsView(state, settings, tenants, rooms, columns, sortItems(shown, columns[_sortColumn], ascending: _sortAscending));
   }
 
-  Room? _findRoomById(List<Room> rooms, int id) => rooms.firstWhereOrNull((r) => r.id == id);
+  List<TableColumn<Reading>> _columns(Map<int, Tenant> tenants, Map<int, Room> rooms) {
+    String tenantName(Reading reading) => tenants[reading.tenantId]?.name ?? 'Unknown Tenant';
+    String roomName(Reading reading) => rooms[reading.roomId]?.name ?? 'Unknown Room';
 
-  Tenant? _findTenantById(List<Tenant> tenants, int id) => tenants.firstWhereOrNull((t) => t.id == id);
-
-  String _getRoomName(List<Room> rooms, int id) => _findRoomById(rooms, id)?.name ?? 'Unknown Room';
-
-  String _getTenantName(List<Tenant> tenants, int id) => _findTenantById(tenants, id)?.name ?? 'Unknown Tenant';
+    return [
+      TableColumn('Tenant', (reading) => Text(tenantName(reading)), sortKey: (reading) => tenantName(reading).toLowerCase()),
+      TableColumn('Previous (kWh)', (reading) => Text('${reading.prevReading}'), sortKey: (reading) => reading.prevReading, numeric: true),
+      TableColumn('Current (kWh)', (reading) => Text('${reading.currReading}'), sortKey: (reading) => reading.currReading, numeric: true),
+      TableColumn('Consumption (kWh)', (reading) => Text('${reading.consumption}'), sortKey: (reading) => reading.consumption, numeric: true),
+      TableColumn('Date', (reading) => Text(_dateFormat.format(reading.createdAt)), sortKey: (reading) => reading.createdAt),
+      TableColumn('Room', (reading) => Text(roomName(reading)), sortKey: (reading) => roomName(reading).toLowerCase()),
+    ];
+  }
 
   Future<void> _deleteReading(int id) async {
     final completer = Completer<void>();
@@ -69,85 +102,57 @@ class ReadingsPageState extends State<ReadingsPage> {
     return completer.future;
   }
 
-  Future<void> _showReadingDialog({Reading? reading}) async {
-    final state = readingBloc.state;
-    if (state is! ReadingLoaded) return;
-
-    final rooms = state.rooms;
-    final tenants = state.tenants;
-    final readings = state.readings;
-
-    final result = await showDialog<Map<String, dynamic>?>(
+  Future<void> _showReadingDialog(ReadingLoaded state, {Reading? reading}) async {
+    final result = await showDialog<ReadingRequest>(
       context: context,
       builder: (context) => ReadingFormDialog(
         showActiveOnly: _showActiveOnly,
         selectedRoomId: _filterRoomId,
         selectedTenantId: _filterTenantId,
         reading: reading,
-        rooms: rooms,
-        tenants: tenants,
-        readings: readings,
+        rooms: state.rooms,
+        tenants: state.tenants,
+        readings: state.readings,
       ),
     );
-
     if (!mounted || result == null) return;
 
-    final request = ReadingRequest(
-      roomId: result['roomId'] as int,
-      tenantId: result['tenantId'] as int,
-      currReading: result['currReading'] as int,
-      prevReading: result['prevReading'] as int,
-    );
-
-    if (reading != null) {
-      readingBloc.add(UpdateReading(reading.id, request));
-    } else {
-      readingBloc.add(AddReading(request));
-    }
+    // Replaced by the bloc's result (see the listener).
+    CustomSnackbar.show(context, reading != null ? 'Updating reading...' : 'Adding reading...', type: SnackBarType.loading);
+    readingBloc.add(reading != null ? UpdateReading(reading.id, result) : AddReading(result));
   }
 
-  void _showReadingDetailsDialog(Reading reading, List<Room> rooms, List<Tenant> tenants) {
+  void _showReadingDetailsDialog(Reading reading, _ReadingsView view) {
     showDialog(
       context: context,
       builder: (context) => ReadingDetailsDialog(
         reading: reading,
-        getTenantName: (id) => _getTenantName(tenants, id),
-        getRoomName: (id) => _getRoomName(rooms, id),
+        getTenantName: (id) => view.tenants[id]?.name ?? 'Unknown Tenant',
+        getRoomName: (id) => view.rooms[id]?.name ?? 'Unknown Room',
         dateFormat: _dateFormat,
       ),
     );
   }
 
+  /// Only data loads change what the page shows; action results are reported by the listener.
+  static bool _shows(ReadingState state) => state is ReadingInitial || state is ReadingLoading || state is ReadingLoaded || state is ReadingError;
+
   @override
   Widget build(BuildContext context) {
-    final theme = AppTheme.lightTheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final bool isNarrow = screenWidth < 600;
-    final horizontalPadding = screenWidth * 0.05;
-
     return Theme(
-      data: theme,
+      data: AppTheme.lightTheme,
       child: Scaffold(
         appBar: CustomAppBar(
           title: 'Electricity Readings',
           showRefresh: true,
-          onRefresh: () {
-            readingBloc.add(LoadReadings());
-          },
+          onRefresh: () => readingBloc.add(LoadReadings()),
           actions: [
-            buildActiveToggleFilter(
-              showActiveOnly: _showActiveOnly,
-              onChanged: (val) {
-                setState(() {
-                  _showActiveOnly = val;
-                  readingBloc.add(LoadReadings());
-                });
-              },
-            ),
+            buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value)),
             const SizedBox(width: 8),
           ],
         ),
         body: BlocBuilder<AuthBloc, AuthState>(
+          buildWhen: (previous, current) => previous.runtimeType != current.runtimeType,
           builder: (context, authState) {
             if (authState is Unauthenticated) {
               return ErrorView(message: authState.message);
@@ -155,8 +160,12 @@ class ReadingsPageState extends State<ReadingsPage> {
 
             return BlocListener<ReadingBloc, ReadingState>(
               listener: (context, state) {
-                if (state is ReadingError) {
-                  CustomSnackbar.show(context, state.message, type: SnackBarType.error);
+                if (state is ReadingActionFailed) {
+                  CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+                } else if (state is ReadingError) {
+                  CustomSnackbar.hide(context);
+                  // A failed load may mean the session expired; the auth check then shows the login error.
+                  context.read<AuthBloc>().add(CheckAuthStatus());
                 } else if (state is AddSuccess) {
                   CustomSnackbar.show(context, 'Reading created', type: SnackBarType.success);
                 } else if (state is UpdateSuccess) {
@@ -166,85 +175,25 @@ class ReadingsPageState extends State<ReadingsPage> {
                 }
               },
               child: BlocBuilder<ReadingBloc, ReadingState>(
+                buildWhen: (_, state) => _shows(state),
                 builder: (context, state) {
-                  if (state is ReadingLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
                   if (state is ReadingError) {
-                    authBloc.add(CheckAuthStatus());
                     return ErrorView(message: state.message, onRetry: () => readingBloc.add(LoadReadings()));
                   }
-
-                  if (state is ReadingLoaded) {
-                    final filteredReadings = _applyFilters(state.readings, _filterRoomId, _filterYear, _filterMonth, _filterTenantId);
-                    return Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
-                      child: Center(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            if (isNarrow)
-                              Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(child: _buildRoomFilter(state.rooms, state.tenants)),
-                                      const SizedBox(width: 12),
-                                      Expanded(child: _buildTenantFilter(state.tenants, state.readings)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(child: _buildMonthFilter(state.readings)),
-                                      const SizedBox(width: 12),
-                                      Expanded(child: _buildYearFilter(state.readings)),
-                                    ],
-                                  ),
-                                ],
-                              )
-                            else
-                              Row(
-                                children: [
-                                  Expanded(child: _buildRoomFilter(state.rooms, state.tenants)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildTenantFilter(state.tenants, state.readings)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildYearFilter(state.readings)),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _buildMonthFilter(state.readings)),
-                                ],
-                              ),
-                            const SizedBox(height: 12),
-                            Expanded(
-                              child: RefreshIndicator(
-                                onRefresh: () async {
-                                  readingBloc.add(LoadReadings());
-                                  await readingBloc.stream.firstWhere((s) => s is! ReadingLoading);
-                                },
-                                child: SingleChildScrollView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  child: _buildReadingsTable(filteredReadings, state.rooms, state.tenants),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                  if (state is! ReadingLoaded) {
+                    return const Center(child: CircularProgressIndicator());
                   }
-
-                  return const SizedBox.shrink();
+                  return _buildContent(context, _viewOf(state));
                 },
               ),
             );
           },
         ),
         floatingActionButton: BlocBuilder<ReadingBloc, ReadingState>(
+          buildWhen: (_, state) => _shows(state),
           builder: (context, state) {
             if (state is ReadingLoaded) {
-              return CustomAddButton(onPressed: () => _showReadingDialog(), label: 'New Reading');
+              return CustomAddButton(onPressed: () => _showReadingDialog(state), label: 'New Reading');
             }
             return const SizedBox.shrink();
           },
@@ -253,127 +202,98 @@ class ReadingsPageState extends State<ReadingsPage> {
     );
   }
 
-  Widget _buildRoomFilter(List<Room> rooms, List<Tenant> tenants) {
-    return buildRoomFilter(
-      rooms: rooms,
-      tenants: tenants,
-      selectedRoomId: _filterRoomId,
-      selectedTenantId: _filterTenantId,
-      onFilterChanged: (roomId, tenantId) {
-        setState(() {
-          _filterRoomId = roomId;
-          _filterTenantId = tenantId;
-        });
-      },
-    );
-  }
-
-  Widget _buildTenantFilter(List<Tenant> tenants, List<Reading> readings) {
-    return buildTenantFilter(
-      tenants: tenants,
-      readings: readings,
-      selectedRoomId: _filterRoomId,
-      selectedTenantId: _filterTenantId,
-      showActiveOnly: _showActiveOnly,
-      onFilterChanged: (tenantId, roomId) {
-        setState(() {
-          _filterTenantId = tenantId;
-          _filterRoomId = roomId;
-        });
-      },
-    );
-  }
-
-  Widget _buildYearFilter(List<Reading> readings) {
-    return buildYearFilter(
-      readings: readings,
-      selectedYear: _filterYear,
-      onYearChanged: (val) {
-        setState(() {
-          _filterYear = val;
-        });
-      },
-    );
-  }
-
-  Widget _buildMonthFilter(List<Reading> readings) {
-    return buildMonthFilter(
-      readings: readings,
-      selectedMonth: _filterMonth,
-      onMonthChanged: (val) {
-        setState(() {
-          _filterMonth = val;
-        });
-      },
-    );
-  }
-
-  Widget _buildReadingsTable(List<Reading> readings, List<Room> rooms, List<Tenant> tenants) {
-    final filteredReadings = readings.where((reading) {
-      if (!_showActiveOnly) return true;
-
-      try {
-        final tenant = tenants.firstWhere((t) => t.id == reading.tenantId);
-        return tenant.isActive;
-      } catch (e) {
-        return false;
-      }
-    }).toList();
-
-    if (filteredReadings.isEmpty) {
-      return const Center(child: Text('No readings found for the selected filters.'));
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        showCheckboxColumn: false,
-        columns: const [
-          DataColumn(label: Text('Actions')),
-          DataColumn(label: Text('Room')),
-          DataColumn(label: Text('Tenant')),
-          DataColumn(label: Text('Previous (kWh)')),
-          DataColumn(label: Text('Current (kWh)')),
-          DataColumn(label: Text('Consumption (kWh)')),
-          DataColumn(label: Text('Date')),
-        ],
-        rows: filteredReadings.map((reading) {
-          return DataRow(
-            onSelectChanged: (_) => _showReadingDetailsDialog(reading, rooms, tenants),
-            cells: [
-              DataCell(
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () => _showReadingDialog(reading: reading),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () async {
-                        await showConfirmationAction(
-                          context: context,
-                          messenger: ScaffoldMessenger.of(context),
-                          confirmTitle: 'Confirm Deletion',
-                          confirmContent: 'Are you sure you want to delete this reading?',
-                          onConfirmed: () async {
-                            await _deleteReading(reading.id);
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                ),
+  Widget _buildContent(BuildContext context, _ReadingsView view) {
+    final state = view.state;
+    return ResponsiveCenter(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, context.windowSize.isCompact ? 0 : 16),
+        child: Column(
+          children: [
+            buildFilterBar(
+              context,
+              room: buildRoomFilter(
+                rooms: state.rooms,
+                tenants: state.tenants,
+                selectedRoomId: _filterRoomId,
+                selectedTenantId: _filterTenantId,
+                onFilterChanged: (roomId, tenantId) => setState(() {
+                  _filterRoomId = roomId;
+                  _filterTenantId = tenantId;
+                }),
               ),
-              DataCell(Text(_getRoomName(rooms, reading.roomId))),
-              DataCell(Text(_getTenantName(tenants, reading.tenantId))),
-              DataCell(Text(reading.prevReading.toString())),
-              DataCell(Text(reading.currReading.toString())),
-              DataCell(Text(reading.consumption.toString())),
-              DataCell(Text(_dateFormat.format(reading.createdAt))),
-            ],
-          );
-        }).toList(),
+              tenant: buildTenantFilter(
+                tenants: state.tenants,
+                selectedRoomId: _filterRoomId,
+                selectedTenantId: _filterTenantId,
+                showActiveOnly: _showActiveOnly,
+                allLabel: 'All Tenants',
+                onFilterChanged: (tenantId, roomId) => setState(() {
+                  _filterTenantId = tenantId;
+                  _filterRoomId = roomId;
+                }),
+              ),
+              year: buildYearFilter(
+                dates: state.readings.map((reading) => reading.createdAt),
+                selectedYear: _filterYear,
+                onYearChanged: (year) => setState(() => _filterYear = year),
+              ),
+              month: buildMonthFilter(selectedMonth: _filterMonth, onMonthChanged: (month) => setState(() => _filterMonth = month)),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  readingBloc.add(LoadReadings());
+                  await readingBloc.stream.firstWhere((s) => s is! ReadingLoading);
+                },
+                child: view.readings.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(child: Text('No readings found for the selected filters.')),
+                          ),
+                        ],
+                      )
+                    : ResponsiveTable<Reading>(
+                        items: view.readings,
+                        columns: view.columns,
+                        sortColumn: _sortColumn,
+                        sortAscending: _sortAscending,
+                        onSort: (column, ascending) => setState(() {
+                          _sortColumn = column;
+                          _sortAscending = ascending;
+                        }),
+                        // Narrower screens get cards: the table needs about this much width.
+                        tableMinWidth: 900,
+                        onTap: (reading) => _showReadingDetailsDialog(reading, view),
+                        actions: (reading) => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Edit reading',
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () => _showReadingDialog(state, reading: reading),
+                            ),
+                            IconButton(
+                              tooltip: 'Delete reading',
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => showConfirmationAction(
+                                context: context,
+                                messenger: ScaffoldMessenger.of(context),
+                                confirmTitle: 'Confirm Deletion',
+                                confirmContent: 'Are you sure you want to delete this reading?',
+                                onConfirmed: () => _deleteReading(reading.id),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

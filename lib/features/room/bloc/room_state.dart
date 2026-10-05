@@ -33,3 +33,18 @@ class RoomError extends RoomState {
   @override
   List<Object?> get props => [message];
 }
+
+/// Creating, updating or deleting a room failed; the page keeps showing the rooms and reports [message].
+class RoomActionFailed extends RoomState {
+  static int _count = 0;
+
+  final String message;
+
+  /// Makes every failure a new state, so the same failure twice in a row is reported twice.
+  final int _id = _count++;
+
+  RoomActionFailed(this.message);
+
+  @override
+  List<Object?> get props => [message, _id];
+}

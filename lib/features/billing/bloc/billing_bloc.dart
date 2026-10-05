@@ -17,27 +17,39 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<DeleteBill>(_onDeleteBill);
   }
 
+  static String _reason(Object e) => e is ApiException ? e.message : '$e';
+
   Future<void> _onLoadBills(LoadBills event, Emitter<BillingState> emit) async {
     emit(BillingLoading());
     try {
-      final bills = await billApi.list();
-      final rooms = await roomApi.list();
-      final tenants = await tenantApi.list();
-      final readings = await readingApi.list();
-      emit(BillingLoaded(bills, rooms, tenants, readings));
+      // Independent requests, sent together; the first failure is reported.
+      final data = await Future.wait<Object>([billApi.list(), roomApi.list(), tenantApi.list(), readingApi.list()]);
+      emit(BillingLoaded(data[0] as List<Bill>, data[1] as List<Room>, data[2] as List<Tenant>, data[3] as List<Reading>));
     } catch (e) {
-      emit(BillingError('Failed to load billing data: $e'));
+      emit(BillingError('Failed to load billing data: ${_reason(e)}'));
     }
   }
 
   Future<void> _onAddBill(AddBill event, Emitter<BillingState> emit) async {
+    final Bill created;
     try {
-      await billApi.create(event.request);
-      add(LoadBills());
-      emit(AddSuccess());
+      created = await billApi.create(event.request);
     } catch (e) {
-      emit(BillingError('Failed to create bill: $e'));
+      emit(BillingActionFailed('Failed to create bill: ${_reason(e)}'));
+      return;
     }
+    final receipt = event.receipt;
+    if (receipt != null) {
+      try {
+        await billApi.uploadReceipt(created.id, event.request, bytes: receipt.bytes, filename: receipt.filename, contentType: receipt.contentType);
+      } catch (e) {
+        add(LoadBills());
+        emit(BillingActionFailed('Bill created, but the receipt upload failed: ${_reason(e)}'));
+        return;
+      }
+    }
+    add(LoadBills());
+    emit(AddSuccess());
   }
 
   Future<void> _onUpdateBill(UpdateBill event, Emitter<BillingState> emit) async {
@@ -51,7 +63,7 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       add(LoadBills());
       emit(UpdateSuccess());
     } catch (e) {
-      emit(BillingError('Failed to update bill: $e'));
+      emit(BillingActionFailed('Failed to update bill: ${_reason(e)}'));
     }
   }
 
@@ -63,7 +75,7 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       emit(DeleteSuccess());
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(BillingError('Failed to delete bill: $e'));
+      emit(BillingActionFailed('Failed to delete bill: ${_reason(e)}'));
     }
   }
 }

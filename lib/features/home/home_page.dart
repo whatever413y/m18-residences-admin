@@ -5,6 +5,7 @@ import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/auth/auth_state.dart';
 import 'package:m18_residences_admin/features/billing/billings_page.dart';
 import 'package:m18_residences_admin/features/home/widgets/square_button.dart';
+import 'package:m18_residences_admin/features/payments/payments_page.dart';
 import 'package:m18_residences_admin/features/reading/readings_page.dart';
 import 'package:m18_residences_admin/features/room/rooms_page.dart';
 import 'package:m18_residences_admin/features/tenants/tenants_page.dart';
@@ -37,7 +38,6 @@ class HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final theme = AppTheme.lightTheme;
     final primaryColor = theme.primaryColor;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     return Theme(
       data: theme,
@@ -50,6 +50,8 @@ class HomePageState extends State<HomePage> {
             }
 
             return Container(
+              // The gradient fills the screen, however few buttons there are.
+              constraints: const BoxConstraints.expand(),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [primaryColor.withValues(alpha: 0.9), primaryColor.withValues(alpha: 0.6)],
@@ -57,28 +59,43 @@ class HomePageState extends State<HomePage> {
                   end: Alignment.bottomCenter,
                 ),
               ),
-              child: Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: screenWidth < 600 ? screenWidth : 600),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+                child: ResponsiveCenter(
+                  maxWidth: 960,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // One column on phones, two on tablets, three on desktops.
+                      final columns = switch (WindowSize.fromWidth(constraints.maxWidth)) {
+                        WindowSize.compact => 1,
+                        WindowSize.medium => 2,
+                        WindowSize.expanded => 3,
+                      };
+                      const gap = 20.0;
+                      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+                      final buttons = [
                         SquareButton(text: "Rooms", icon: Icons.meeting_room, onTap: () => _navigateToPage(RoomsPage()), color: primaryColor),
-                        const SizedBox(height: 20),
                         SquareButton(text: "Tenants", icon: Icons.people, onTap: () => _navigateToPage(TenantsPage()), color: primaryColor),
-                        const SizedBox(height: 20),
                         SquareButton(
                           text: "Electric Readings",
                           icon: Icons.flash_on,
                           onTap: () => _navigateToPage(ReadingsPage()),
                           color: primaryColor,
                         ),
-                        const SizedBox(height: 20),
                         SquareButton(text: "Billing", icon: Icons.receipt_long, onTap: () => _navigateToPage(BillingsPage()), color: primaryColor),
-                      ],
-                    ),
+                        SquareButton(
+                          text: "Payment QR Codes",
+                          icon: Icons.qr_code_2,
+                          onTap: () => _navigateToPage(const PaymentsPage()),
+                          color: primaryColor,
+                        ),
+                      ];
+                      return Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [for (final button in buttons) SizedBox(width: width, child: button)],
+                      );
+                    },
                   ),
                 ),
               ),
