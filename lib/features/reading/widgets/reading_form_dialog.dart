@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -74,12 +73,12 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      scrollable: true,
-      title: Text(widget.reading == null ? 'Add New Reading' : 'Edit Reading'),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.bolt_outlined),
+      title: widget.reading == null ? 'Add New Reading' : 'Edit Reading',
+      subtitle: 'Meter readings in kWh',
       actions: _buildActions(context, widget.reading != null),
+      child: _buildContent(),
     );
   }
 
@@ -107,14 +106,7 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
       Semantics(
         container: true,
         identifier: 'reading-save',
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: Text(widget.reading == null ? 'Add' : 'Save'),
-        ),
+        child: FilledButton(onPressed: _submit, child: Text(widget.reading == null ? 'Add' : 'Save')),
       ),
     ];
   }

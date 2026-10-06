@@ -9,7 +9,6 @@ import 'package:m18_residences_admin/features/payments/bloc/payment_event.dart';
 import 'package:m18_residences_admin/features/payments/bloc/payment_state.dart';
 import 'package:m18_residences_admin/features/payments/widgets/payment_card.dart';
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 /// The payment methods' QR codes tenants pay with: view, save and replace them.
@@ -25,7 +24,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
   void _replace(String name, Uint8List png) {
     // Replaced by the bloc's result (see the listener).
-    CustomSnackbar.show(context, 'Uploading the ${paymentMethodLabels[name] ?? name} QR code...', type: SnackBarType.loading);
+    AppToast.show(context, 'Uploading the ${paymentMethodLabels[name] ?? name} QR code...', type: ToastType.loading);
     paymentBloc.add(ReplacePayment(name, png));
   }
 
@@ -36,13 +35,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
       body: BlocListener<PaymentBloc, PaymentState>(
         listener: (context, state) {
           if (state is PaymentActionFailed) {
-            CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+            AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is PaymentError) {
-            CustomSnackbar.hide(context);
+            AppToast.hide();
             // A failed load may mean the session expired; the auth check then shows the login error.
             context.read<AuthBloc>().add(CheckAuthStatus());
           } else if (state is PaymentReplaced) {
-            CustomSnackbar.show(context, '${paymentMethodLabels[state.name] ?? state.name} QR code replaced', type: SnackBarType.success);
+            AppToast.show(context, '${paymentMethodLabels[state.name] ?? state.name} QR code replaced', type: ToastType.success);
           }
         },
         child: BlocBuilder<PaymentBloc, PaymentState>(

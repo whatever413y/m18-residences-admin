@@ -9,7 +9,6 @@ import 'package:m18_residences_admin/features/billing/bloc/billing_state.dart';
 import 'package:m18_residences_admin/features/billing/widgets/billing_details_dialog.dart';
 import 'package:m18_residences_admin/features/shell/admin_shell.dart';
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -127,7 +126,7 @@ class _VerifyCardState extends State<_VerifyCard> {
         electricCharges: bill.electricCharges,
         additionalCharges: bill.additionalCharges,
       );
-      CustomSnackbar.show(context, 'Attaching receipt...', type: SnackBarType.loading);
+      AppToast.show(context, 'Attaching receipt...', type: ToastType.loading);
       context.read<BillingBloc>().add(UpdateBill(bill.id, request, receipt: receipt));
     } catch (e) {
       if (mounted) setState(() => _error = e is ReceiptException ? e.message : 'Could not read the file: $e');

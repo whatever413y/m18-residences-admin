@@ -1,7 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:m18_residences_admin/features/billing/widgets/attach_file_button.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -227,11 +226,12 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      title: Text(_isEditing ? 'Update Bill' : 'Generate Bill'),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.receipt_long_outlined),
+      title: _isEditing ? 'Update Bill' : 'Generate Bill',
+      subtitle: 'Room and electricity fill in from the tenant and reading',
       actions: _buildActions(context),
+      child: _buildContent(),
     );
   }
 
@@ -331,7 +331,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     padding: const EdgeInsets.all(12.0),
     child: Text(
       '₱',
-      style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
+      style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 18, fontWeight: FontWeight.w600),
     ),
   );
 
@@ -413,13 +413,9 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       Semantics(
         container: true,
         identifier: 'bill-save',
-        child: ElevatedButton(
+        child: FilledButton(
           // Disabled while a picked file is being converted.
           onPressed: _preparing > 0 ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
           child: Text(_isEditing ? 'Update Bill' : 'Generate Bill'),
         ),
       ),

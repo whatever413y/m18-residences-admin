@@ -21,7 +21,6 @@ import 'package:m18_residences_admin/features/tenants/bloc/tenant_bloc.dart';
 import 'package:m18_residences_admin/features/tenants/bloc/tenant_event.dart';
 import 'package:m18_residences_admin/features/tenants/tenants_page.dart';
 import 'package:m18_residences_admin/features/verify/verify_page.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 enum AdminTab { dashboard, verify, billing, readings, tenants, rooms, payments }
@@ -173,17 +172,17 @@ class AdminShellState extends State<AdminShell> {
 
   void _reportBillResult(BuildContext context, BillingState state) {
     if (state is BillingActionFailed) {
-      CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+      AppToast.show(context, state.message, type: ToastType.error);
     } else if (state is BillingError) {
-      CustomSnackbar.hide(context);
+      AppToast.hide();
       // A failed load may mean the session expired; the auth check then shows the login error.
       context.read<AuthBloc>().add(CheckAuthStatus());
     } else if (state is AddSuccess) {
-      CustomSnackbar.show(context, 'Bill created', type: SnackBarType.success);
+      AppToast.show(context, 'Bill created', type: ToastType.success);
     } else if (state is UpdateSuccess) {
-      CustomSnackbar.show(context, 'Bill updated', type: SnackBarType.success);
+      AppToast.show(context, 'Bill updated', type: ToastType.success);
     } else if (state is DeleteSuccess) {
-      CustomSnackbar.show(context, 'Bill deleted', type: SnackBarType.success);
+      AppToast.show(context, 'Bill deleted', type: ToastType.success);
     }
   }
 }

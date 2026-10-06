@@ -12,7 +12,6 @@ import 'package:m18_residences_admin/features/tenants/widgets/tenant_form_dialog
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_add_button.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/entity_card.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
@@ -37,8 +36,8 @@ class _TenantsPageState extends State<TenantsPage> {
   }
 
   Future<void> _showTenantDialog({Tenant? tenant, required List<Room> rooms, bool isEditing = false}) async {
-    final result = await showSelectableDialog<Map<String, dynamic>?>(
-      context: context,
+    final result = await showAppModal<Map<String, dynamic>?>(
+      context,
       builder: (_) => TenantFormDialog(tenant: tenant, rooms: rooms, isEditing: isEditing),
     );
 
@@ -53,6 +52,8 @@ class _TenantsPageState extends State<TenantsPage> {
       isActive: tenant != null ? result['isActive'] as bool : null,
     );
 
+    // Replaced by the bloc's result (see the listener).
+    AppToast.show(context, tenant != null ? 'Saving tenant...' : 'Adding tenant...', type: ToastType.loading);
     if (tenant != null) {
       tenantBloc.add(UpdateTenantEvent(tenant.id, request));
     } else {
@@ -61,12 +62,11 @@ class _TenantsPageState extends State<TenantsPage> {
   }
 
   Future<void> _confirmDelete(Tenant tenant) async {
-    final messenger = ScaffoldMessenger.of(context);
     await showConfirmationAction(
       context: context,
-      messenger: messenger,
-      confirmTitle: 'Confirm Deletion',
-      confirmContent: 'Are you sure you want to delete this tenant?',
+      title: 'Delete ${tenant.name}?',
+      message: "This can't be undone. A tenant with readings or bills can't be deleted: set them inactive instead.",
+      confirmLabel: 'Delete tenant',
       onConfirmed: () async {
         await _deleteTenant(tenant.id);
       },
@@ -90,16 +90,16 @@ class _TenantsPageState extends State<TenantsPage> {
       body: BlocListener<TenantBloc, TenantState>(
         listener: (context, state) {
           if (state is TenantActionFailed) {
-            CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+            AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is TenantError) {
             // A failed load may mean the session expired; the auth check then shows the login error.
             authBloc.add(CheckAuthStatus());
           } else if (state is AddSuccess) {
-            CustomSnackbar.show(context, 'Tenant created', type: SnackBarType.success);
+            AppToast.show(context, 'Tenant created', type: ToastType.success);
           } else if (state is UpdateSuccess) {
-            CustomSnackbar.show(context, 'Tenant updated', type: SnackBarType.success);
+            AppToast.show(context, 'Tenant updated', type: ToastType.success);
           } else if (state is DeleteSuccess) {
-            CustomSnackbar.show(context, 'Tenant deleted', type: SnackBarType.success);
+            AppToast.show(context, 'Tenant deleted', type: ToastType.success);
           }
         },
         child: BlocBuilder<TenantBloc, TenantState>(

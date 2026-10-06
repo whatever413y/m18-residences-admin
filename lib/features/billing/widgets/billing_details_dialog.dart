@@ -8,8 +8,8 @@ import 'package:m18_residences_shared/m18_residences_shared.dart';
 Future<void> showBillDetails(BuildContext context, Bill bill, {required Map<int, Tenant> tenants, required Map<int, Room> rooms}) {
   final tenant = tenants[bill.tenantId];
   final room = rooms[bill.reading?.roomId ?? tenant?.roomId];
-  return showSelectableDialog(
-    context: context,
+  return showAppModal(
+    context,
     builder: (_) => BillingDetailsDialog(
       bill: bill,
       tenantName: tenant?.name ?? 'Unknown Tenant',
@@ -41,80 +41,49 @@ class BillingDetailsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final compact = context.windowSize.isCompact;
-    return Dialog(
-      insetPadding: compact ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return AppModal(
+      overline: 'Billing Details',
+      title: tenantName,
+      subtitle: '$roomName · $date',
+      trailing: Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
+      maxWidth: 480,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _section(context, 'Charges'),
+          _row(context, 'Consumption', '$consumption kWh'),
+          _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
+          _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
+          for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
+            _row(context, charge.description.isNotEmpty ? charge.description : 'Additional charge', formatPeso(charge.amount)),
+          for (final charge in bill.additionalCharges.where((c) => c.amount < 0))
+            _row(context, '${charge.description.isNotEmpty ? charge.description : 'Discount'} (discount)', formatPeso(charge.amount)),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
+          _row(context, 'Total Amount', formatPeso(bill.totalAmount), emphasized: true, semanticsId: 'bill-details-total'),
+          const SizedBox(height: 20),
+          _section(context, 'Payment from tenant'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Billing Details', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                        const SizedBox(height: 4),
-                        Text(tenantName, style: theme.textTheme.headlineSmall),
-                        const SizedBox(height: 2),
-                        Text('$roomName · $date', style: theme.textTheme.bodySmall),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _section(context, 'Charges'),
-              _row(context, 'Consumption', '$consumption kWh'),
-              _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
-              _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
-              for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
-                _row(context, charge.description.isNotEmpty ? charge.description : 'Additional charge', formatPeso(charge.amount)),
-              for (final charge in bill.additionalCharges.where((c) => c.amount < 0))
-                _row(context, '${charge.description.isNotEmpty ? charge.description : 'Discount'} (discount)', formatPeso(charge.amount)),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
-              _row(context, 'Total Amount', formatPeso(bill.totalAmount), emphasized: true, semanticsId: 'bill-details-total'),
-              const SizedBox(height: 20),
-              _section(context, 'Payment from tenant'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (!bill.hasPayment)
-                    Text('No payment uploaded', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  Semantics(
-                    container: true,
-                    identifier: 'bill-view-payment',
-                    child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _section(context, 'Receipt from owner'),
-              if (bill.hasReceipt)
-                Align(alignment: Alignment.centerLeft, child: buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl))
-              else
-                Text(
-                  'No receipt yet: attach one with Edit bill or in Verify',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                ),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+              if (!bill.hasPayment) Text('No payment uploaded', style: muted),
+              Semantics(
+                container: true,
+                identifier: 'bill-view-payment',
+                child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          _section(context, 'Receipt from owner'),
+          if (bill.hasReceipt)
+            Align(alignment: Alignment.centerLeft, child: buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl))
+          else
+            Text('No receipt yet: attach one with Edit bill or in Verify', style: muted),
+        ],
       ),
     );
   }

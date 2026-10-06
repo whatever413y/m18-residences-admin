@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class TenantFormDialog extends StatefulWidget {
@@ -53,12 +52,12 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.tenant != null;
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      scrollable: true,
-      title: _buildTitle(isEditing),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.person_outline),
+      title: isEditing ? 'Edit Tenant' : 'Add New Tenant',
+      subtitle: isEditing ? widget.tenant!.name : 'The name is also their account ID',
       actions: _buildActions(context, isEditing),
+      child: _buildContent(),
     );
   }
 
@@ -88,12 +87,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
           _isActive = val;
         });
       },
-      activeThumbColor: Theme.of(context).primaryColor,
     );
-  }
-
-  Widget _buildTitle(bool isEditing) {
-    return Text(isEditing ? 'Edit Tenant' : 'Add New Tenant');
   }
 
   Widget _buildNameField() {
@@ -103,7 +97,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
       semanticsId: 'tenant-name',
       validator: (value) => (value == null || value.trim().isEmpty) ? 'Enter tenant' : null,
       onFieldSubmitted: (_) => _submit(),
-      prefixIcon: Icon(Icons.person, color: Theme.of(context).primaryColor),
+      prefixIcon: const Icon(Icons.person_outline),
     );
   }
 
@@ -169,14 +163,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
       Semantics(
         container: true,
         identifier: 'tenant-save',
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: Text(isEditing ? 'Save' : 'Add'),
-        ),
+        child: FilledButton(onPressed: _submit, child: Text(isEditing ? 'Save' : 'Add')),
       ),
     ];
   }

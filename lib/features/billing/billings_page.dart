@@ -11,7 +11,6 @@ import 'package:m18_residences_admin/features/billing/widgets/billing_form_dialo
 import 'package:m18_residences_admin/features/shell/admin_shell.dart';
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/responsive_table.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
@@ -163,8 +162,8 @@ class BillingsPageState extends State<BillingsPage> {
   }
 
   Future<void> _showBillingDialog(BillingLoaded state, {Bill? bill}) async {
-    final result = await showSelectableDialog<BillFormResult>(
-      context: context,
+    final result = await showAppModal<BillFormResult>(
+      context,
       builder: (context) => BillingFormDialog(
         showActiveOnly: _showActiveOnly,
         bill: bill,
@@ -178,7 +177,7 @@ class BillingsPageState extends State<BillingsPage> {
     if (!mounted || result == null) return;
 
     // Replaced by the bloc's result (see the listener).
-    CustomSnackbar.show(context, bill != null ? 'Updating bill...' : 'Creating bill...', type: SnackBarType.loading);
+    AppToast.show(context, bill != null ? 'Updating bill...' : 'Creating bill...', type: ToastType.loading);
     billingBloc.add(
       bill != null
           ? UpdateBill(bill.id, result.request, receipt: result.receipt, payment: result.payment, removePayment: result.removePayment)
@@ -323,9 +322,9 @@ class BillingsPageState extends State<BillingsPage> {
           icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
           onPressed: () => showConfirmationAction(
             context: context,
-            messenger: ScaffoldMessenger.of(context),
-            confirmTitle: 'Delete Bill',
-            confirmContent: 'Are you sure you want to delete this bill? Its receipt and payment images are kept in the archive.',
+            title: "Delete $tenantName's ${DateFormat.yMMMM().format(bill.createdAt)} bill?",
+            message: "This can't be undone. Its receipt and payment images are kept in the archive.",
+            confirmLabel: 'Delete bill',
             onConfirmed: () => _deleteBill(bill.id),
           ),
         ),

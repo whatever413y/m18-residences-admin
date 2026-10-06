@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class RoomFormDialog extends StatefulWidget {
@@ -40,12 +39,12 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.room != null;
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      scrollable: true,
-      title: Text(isEditing ? 'Edit Room' : 'Add New Room'),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.meeting_room_outlined),
+      title: isEditing ? 'Edit Room' : 'Add New Room',
+      subtitle: isEditing ? widget.room!.name : 'Name and monthly rent',
       actions: _buildActions(),
+      child: _buildContent(),
     );
   }
 
@@ -63,7 +62,7 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
       semanticsId: 'room-name',
       textInputAction: TextInputAction.next,
       validator: (val) => (val == null || val.trim().isEmpty) ? 'Enter room name' : null,
-      prefixIcon: Icon(Icons.meeting_room, color: Theme.of(context).primaryColor),
+      prefixIcon: const Icon(Icons.meeting_room_outlined),
     );
   }
 
@@ -85,7 +84,7 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
         padding: const EdgeInsets.all(12.0),
         child: Text(
           '₱',
-          style: TextStyle(color: Theme.of(context).primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 18, fontWeight: FontWeight.w600),
         ),
       ),
       onFieldSubmitted: (_) => _submit(),
@@ -100,14 +99,7 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
       Semantics(
         container: true,
         identifier: 'room-save',
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: Text(isEditing ? 'Save' : 'Add'),
-        ),
+        child: FilledButton(onPressed: _submit, child: Text(isEditing ? 'Save' : 'Add')),
       ),
     ];
   }

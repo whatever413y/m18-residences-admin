@@ -114,7 +114,7 @@ class _AttachFileButtonState extends State<AttachFileButton> {
           children: [
             Semantics(
               identifier: 'bill-attach-$subject',
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: _preparing ? null : _pick,
                 icon: const Icon(Icons.attach_file),
                 label: Text(widget.hasFile || picked != null ? 'Change $_title' : 'Attach $_title'),
