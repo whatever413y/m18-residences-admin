@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:m18_residences_admin/features/billing/widgets/attach_file_button.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -11,9 +10,6 @@ class BillingDetailsDialog extends StatelessWidget {
   final String consumption;
   final String date;
 
-  /// Called with a picked (and converted) payment image; the dialog closes.
-  final ValueChanged<PreparedReceipt> onUploadPayment;
-
   const BillingDetailsDialog({
     super.key,
     required this.bill,
@@ -21,7 +17,6 @@ class BillingDetailsDialog extends StatelessWidget {
     required this.roomName,
     required this.consumption,
     required this.date,
-    required this.onUploadPayment,
   });
 
   @override
@@ -55,7 +50,8 @@ class BillingDetailsDialog extends StatelessWidget {
     );
   }
 
-  /// Status, the payment image (attach or change; Remove is in the Update Bill form) and the receipt.
+  /// Status and View buttons for the payment image and the receipt; they are attached, changed and removed in the
+  /// Update Bill form.
   Widget _buildFiles(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,15 +76,6 @@ class BillingDetailsDialog extends StatelessWidget {
               container: true,
               identifier: 'bill-view-payment',
               child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
-            ),
-            AttachFileButton(
-              kind: BillFileKind.payment,
-              hasFile: bill.hasPayment,
-              onChanged: (payment) {
-                if (payment == null) return;
-                Navigator.of(context).pop();
-                onUploadPayment(payment);
-              },
             ),
           ],
         ),

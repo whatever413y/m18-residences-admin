@@ -14,7 +14,6 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<LoadBills>(_onLoadBills);
     on<AddBill>(_onAddBill);
     on<UpdateBill>(_onUpdateBill);
-    on<UploadPayment>(_onUploadPayment);
     on<DeleteBill>(_onDeleteBill);
   }
 
@@ -65,17 +64,6 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       add(LoadBills());
       emit(BillingActionFailed('$saved, but the payment upload failed: ${_reason(e)}'));
       return false;
-    }
-  }
-
-  Future<void> _onUploadPayment(UploadPayment event, Emitter<BillingState> emit) async {
-    final payment = event.payment;
-    try {
-      await billApi.uploadPayment(event.id, bytes: payment.bytes, filename: payment.filename, contentType: payment.contentType);
-      add(LoadBills());
-      emit(PaymentSuccess('Payment attached'));
-    } catch (e) {
-      emit(BillingActionFailed('Failed to attach the payment: ${_reason(e)}'));
     }
   }
 

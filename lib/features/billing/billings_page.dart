@@ -182,10 +182,6 @@ class BillingsPageState extends State<BillingsPage> {
         roomName: room?.name ?? 'Unknown Room',
         consumption: bill.consumption.toString(),
         date: _dateFormat.format(bill.createdAt),
-        onUploadPayment: (payment) {
-          CustomSnackbar.show(context, 'Attaching payment...', type: SnackBarType.loading);
-          billingBloc.add(UploadPayment(bill.id, payment));
-        },
       ),
     );
   }
@@ -227,8 +223,6 @@ class BillingsPageState extends State<BillingsPage> {
                   CustomSnackbar.show(context, 'Bill updated', type: SnackBarType.success);
                 } else if (state is DeleteSuccess) {
                   CustomSnackbar.show(context, 'Bill deleted', type: SnackBarType.success);
-                } else if (state is PaymentSuccess) {
-                  CustomSnackbar.show(context, state.message, type: SnackBarType.success);
                 }
               },
               child: BlocBuilder<BillingBloc, BillingState>(

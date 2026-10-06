@@ -16,16 +16,6 @@ class UpdateSuccess extends BillingState {}
 
 class DeleteSuccess extends BillingState {}
 
-/// A payment image was attached or removed; [message] says which.
-class PaymentSuccess extends BillingState {
-  final String message;
-
-  PaymentSuccess(this.message);
-
-  @override
-  List<Object?> get props => [message];
-}
-
 class BillingLoaded extends BillingState {
   final List<Bill> bills;
   final List<Room> rooms;

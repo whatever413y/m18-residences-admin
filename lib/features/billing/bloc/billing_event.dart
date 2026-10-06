@@ -46,17 +46,6 @@ class UpdateBill extends BillingEvent {
   List<Object?> get props => [id, request, receipt, payment, removePayment];
 }
 
-/// Attaches (or replaces) the tenant's payment image of bill [id].
-class UploadPayment extends BillingEvent {
-  final int id;
-  final PreparedReceipt payment;
-
-  const UploadPayment(this.id, this.payment);
-
-  @override
-  List<Object?> get props => [id, payment];
-}
-
 class DeleteBill extends BillingEvent {
   final int id;
   final Completer<void> onComplete;

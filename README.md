@@ -16,7 +16,7 @@ Files can be JPEG, PNG, WebP, GIF, AVIF, HEIC/HEIF or PDF. Before uploading, the
 browser can't write WebP; a WebP already smaller than its re-encoding is kept); HEIC is decoded by the package's
 heic-to asset (LGPL-3.0), loaded only when needed; PDFs are uploaded as-is. A receipt or payment can be attached
 when generating the bill or later (`lib/features/billing/widgets/attach_file_button.dart`), and removed with
-Remove in the Update Bill form (applied on save; Billing Details has no Remove); replacing or removing one
+Remove in the Update Bill form (applied on save; Billing Details only shows the status and View buttons); replacing or removing one
 moves the old file to the archive (`archive/` in R2, kept forever). Files are picked with the shared `pickFile` (a plain file input that works on iPhone/iPad Safari).
 
 ## Payment QR codes
