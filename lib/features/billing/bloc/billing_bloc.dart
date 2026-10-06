@@ -15,7 +15,6 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     on<AddBill>(_onAddBill);
     on<UpdateBill>(_onUpdateBill);
     on<UploadPayment>(_onUploadPayment);
-    on<ClearPayment>(_onClearPayment);
     on<DeleteBill>(_onDeleteBill);
   }
 
@@ -80,16 +79,6 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
     }
   }
 
-  Future<void> _onClearPayment(ClearPayment event, Emitter<BillingState> emit) async {
-    try {
-      await billApi.clearPayment(event.id);
-      add(LoadBills());
-      emit(PaymentSuccess('Payment removed'));
-    } catch (e) {
-      emit(BillingActionFailed('Failed to remove the payment: ${_reason(e)}'));
-    }
-  }
-
   Future<void> _onUpdateBill(UpdateBill event, Emitter<BillingState> emit) async {
     try {
       final receipt = event.receipt;
@@ -103,6 +92,15 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
       return;
     }
     if (!await _uploadPayment(event.id, event.payment, emit, 'Bill updated')) return;
+    if (event.removePayment) {
+      try {
+        await billApi.clearPayment(event.id);
+      } catch (e) {
+        add(LoadBills());
+        emit(BillingActionFailed('Bill updated, but removing the payment failed: ${_reason(e)}'));
+        return;
+      }
+    }
     add(LoadBills());
     emit(UpdateSuccess());
   }

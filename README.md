@@ -7,7 +7,7 @@ is behind Cloudflare Access: log in with an allowed email (one-time code), then 
 ## Receipts and payments
 
 A bill has two optional files: the **payment** image from the tenant (they upload it in the tenant app; the admin
-can attach, change or remove it too) and the **receipt** from the owner. The table's Status column and the bill
+can attach or change it too) and the **receipt** from the owner. The table's Status column and the bill
 details show **Unpaid**, **For verification** (payment, no receipt) or **Paid** (receipt). Both open with View
 buttons in a preview dialog; no file names or links are shown.
 
@@ -15,7 +15,8 @@ Files can be JPEG, PNG, WebP, GIF, AVIF, HEIC/HEIF or PDF. Before uploading, the
 `prepareReceipt` from `m18_residences_shared`: at most 1600 px on the long edge, WebP at quality 0.8 (JPEG if the
 browser can't write WebP; a WebP already smaller than its re-encoding is kept); HEIC is decoded by the package's
 heic-to asset (LGPL-3.0), loaded only when needed; PDFs are uploaded as-is. A receipt or payment can be attached
-when generating the bill or later (`lib/features/billing/widgets/attach_file_button.dart`); replacing or removing one
+when generating the bill or later (`lib/features/billing/widgets/attach_file_button.dart`), and removed with
+Remove in the Update Bill form (applied on save; Billing Details has no Remove); replacing or removing one
 moves the old file to the archive (`archive/` in R2, kept forever). Files are picked with the shared `pickFile` (a plain file input that works on iPhone/iPad Safari).
 
 ## Payment QR codes

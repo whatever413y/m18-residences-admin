@@ -12,13 +12,15 @@ class AdditionalChargeInput {
   AdditionalChargeInput({this.amount = 0, this.description = ''});
 }
 
-/// What the bill form returns: the bill to send, and the receipt and payment image picked for it (if any).
+/// What the bill form returns: the bill to send, the receipt and payment image picked for it (if any), and
+/// whether the bill's payment image is to be removed. (A removed receipt is simply not in [request].)
 class BillFormResult {
   final BillRequest request;
   final PreparedReceipt? receipt;
   final PreparedReceipt? payment;
+  final bool removePayment;
 
-  const BillFormResult(this.request, this.receipt, this.payment);
+  const BillFormResult(this.request, this.receipt, this.payment, {this.removePayment = false});
 }
 
 class BillingFormDialog extends StatefulWidget {
@@ -67,6 +69,9 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   int _preparing = 0;
   String? _receiptUrl;
   String? _paymentUrl;
+
+  /// Remove was pressed for the bill's payment image (and no new one picked).
+  bool _removePayment = false;
 
   /// Why the form can't be saved yet (shown above the buttons), e.g. a tenant without a reading.
   String? _formError;
@@ -217,7 +222,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       additionalCharges: additionalCharges,
       receiptUrl: _receiptUrl,
     );
-    Navigator.of(context).pop(BillFormResult(request, _receipt, _payment));
+    Navigator.of(context).pop(BillFormResult(request, _receipt, _payment, removePayment: _removePayment && _payment == null));
   }
 
   @override
@@ -275,6 +280,8 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
           onChanged: (file) => setState(() => _receipt = file),
           onPreparing: _onPreparing,
           current: buildBillFile(context, BillFileKind.receipt, tenantName, _receiptUrl),
+          // Saving without a receipt URL clears it (the server archives the file).
+          onRemove: () => setState(() => _receiptUrl = null),
         ),
         AttachFileButton(
           kind: BillFileKind.payment,
@@ -282,6 +289,10 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
           onChanged: (file) => setState(() => _payment = file),
           onPreparing: _onPreparing,
           current: buildBillFile(context, BillFileKind.payment, tenantName, _paymentUrl),
+          onRemove: () => setState(() {
+            _removePayment = _paymentUrl?.isNotEmpty ?? false;
+            _paymentUrl = null;
+          }),
         ),
       ],
     );

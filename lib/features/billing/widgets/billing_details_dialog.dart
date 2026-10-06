@@ -14,9 +14,6 @@ class BillingDetailsDialog extends StatelessWidget {
   /// Called with a picked (and converted) payment image; the dialog closes.
   final ValueChanged<PreparedReceipt> onUploadPayment;
 
-  /// Called after the admin confirmed removing the payment image; the dialog closes.
-  final VoidCallback onClearPayment;
-
   const BillingDetailsDialog({
     super.key,
     required this.bill,
@@ -25,7 +22,6 @@ class BillingDetailsDialog extends StatelessWidget {
     required this.consumption,
     required this.date,
     required this.onUploadPayment,
-    required this.onClearPayment,
   });
 
   @override
@@ -59,7 +55,7 @@ class BillingDetailsDialog extends StatelessWidget {
     );
   }
 
-  /// Status, the payment image (attach, change, remove) and the receipt.
+  /// Status, the payment image (attach or change; Remove is in the Update Bill form) and the receipt.
   Widget _buildFiles(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,17 +90,6 @@ class BillingDetailsDialog extends StatelessWidget {
                 onUploadPayment(payment);
               },
             ),
-            if (bill.hasPayment)
-              Semantics(
-                container: true,
-                identifier: 'bill-remove-payment',
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: Colors.red.shade800, minimumSize: const Size(48, 48)),
-                  onPressed: () => _confirmClearPayment(context),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Remove'),
-                ),
-              ),
           ],
         ),
         const SizedBox(height: 16),
@@ -116,23 +101,6 @@ class BillingDetailsDialog extends StatelessWidget {
           const Text('No receipt yet: attach one with Edit bill', style: TextStyle(color: Colors.grey)),
       ],
     );
-  }
-
-  Future<void> _confirmClearPayment(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Payment'),
-        content: Text("Remove $tenantName's payment image from this bill? The file is kept in the archive."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    Navigator.of(context).pop();
-    onClearPayment();
   }
 
   Widget _buildTitle() {

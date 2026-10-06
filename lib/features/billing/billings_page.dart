@@ -159,7 +159,7 @@ class BillingsPageState extends State<BillingsPage> {
     CustomSnackbar.show(context, bill != null ? 'Updating bill...' : 'Creating bill...', type: SnackBarType.loading);
     billingBloc.add(
       bill != null
-          ? UpdateBill(bill.id, result.request, receipt: result.receipt, payment: result.payment)
+          ? UpdateBill(bill.id, result.request, receipt: result.receipt, payment: result.payment, removePayment: result.removePayment)
           : AddBill(result.request, receipt: result.receipt, payment: result.payment),
     );
   }
@@ -185,10 +185,6 @@ class BillingsPageState extends State<BillingsPage> {
         onUploadPayment: (payment) {
           CustomSnackbar.show(context, 'Attaching payment...', type: SnackBarType.loading);
           billingBloc.add(UploadPayment(bill.id, payment));
-        },
-        onClearPayment: () {
-          CustomSnackbar.show(context, 'Removing payment...', type: SnackBarType.loading);
-          billingBloc.add(ClearPayment(bill.id));
         },
       ),
     );
