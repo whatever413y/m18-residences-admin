@@ -3,6 +3,25 @@ import 'package:intl/intl.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
+/// Opens [bill]'s details (selectable text). The tenant and room are looked up in [tenants] and [rooms]; the room is
+/// the bill's reading's, else the tenant's current one.
+Future<void> showBillDetails(BuildContext context, Bill bill, {required Map<int, Tenant> tenants, required Map<int, Room> rooms}) {
+  final tenant = tenants[bill.tenantId];
+  final room = rooms[bill.reading?.roomId ?? tenant?.roomId];
+  return showSelectableDialog(
+    context: context,
+    builder: (_) => BillingDetailsDialog(
+      bill: bill,
+      tenantName: tenant?.name ?? 'Unknown Tenant',
+      roomName: room?.name ?? 'Unknown Room',
+      consumption: bill.consumption.toString(),
+      date: DateFormat('MMM d, yyyy').format(bill.createdAt),
+    ),
+  );
+}
+
+/// A bill's details: who and when, every charge down to the total, the status, and View buttons for the tenant's
+/// payment and the receipt (attached, changed and removed in the Update Bill form).
 class BillingDetailsDialog extends StatelessWidget {
   final Bill bill;
   final String tenantName;
@@ -21,192 +40,111 @@ class BillingDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final theme = Theme.of(context);
+    final compact = context.windowSize.isCompact;
+    return Dialog(
+      insetPadding: compact ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 12,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTitle(),
-                const SizedBox(height: 16),
-                _buildDivider(),
-                const SizedBox(height: 16),
-                _buildDetails(),
-                const SizedBox(height: 24),
-                _buildFiles(context),
-                const SizedBox(height: 24),
-                _buildCloseButton(context),
-              ],
-            ),
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Billing Details', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                        const SizedBox(height: 4),
+                        Text(tenantName, style: theme.textTheme.headlineSmall),
+                        const SizedBox(height: 2),
+                        Text('$roomName · $date', style: theme.textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _section(context, 'Charges'),
+              _row(context, 'Consumption', '$consumption kWh'),
+              _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
+              _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
+              for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
+                _row(context, charge.description.isNotEmpty ? charge.description : 'Additional charge', formatPeso(charge.amount)),
+              for (final charge in bill.additionalCharges.where((c) => c.amount < 0))
+                _row(context, '${charge.description.isNotEmpty ? charge.description : 'Discount'} (discount)', formatPeso(charge.amount)),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
+              _row(context, 'Total Amount', formatPeso(bill.totalAmount), emphasized: true, semanticsId: 'bill-details-total'),
+              const SizedBox(height: 20),
+              _section(context, 'Payment from tenant'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (!bill.hasPayment)
+                    Text('No payment uploaded', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Semantics(
+                    container: true,
+                    identifier: 'bill-view-payment',
+                    child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _section(context, 'Receipt from owner'),
+              if (bill.hasReceipt)
+                Align(alignment: Alignment.centerLeft, child: buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl))
+              else
+                Text(
+                  'No receipt yet: attach one with Edit bill or in Verify',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// Status and View buttons for the payment image and the receipt; they are attached, changed and removed in the
-  /// Update Bill form.
-  Widget _buildFiles(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text('Status', style: TextStyle(fontWeight: FontWeight.w600)),
-            const Spacer(),
-            Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Text('Payment from tenant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (!bill.hasPayment) const Text('No payment uploaded', style: TextStyle(color: Colors.grey)),
-            Semantics(
-              container: true,
-              identifier: 'bill-view-payment',
-              child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Text('Receipt from owner', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
-        if (bill.hasReceipt)
-          buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl)
-        else
-          const Text('No receipt yet: attach one with Edit bill', style: TextStyle(color: Colors.grey)),
-      ],
+  Widget _section(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(title, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
     );
   }
 
-  Widget _buildTitle() {
-    return Text(
-      'Billing Details',
-      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(color: Colors.grey.shade300, thickness: 1);
-  }
-
-  Widget _spacer() => const SizedBox(height: 12);
-
-  Widget _buildDetails() {
-    final currencyFormat = NumberFormat.currency(locale: 'en_PH', symbol: '₱', decimalDigits: 0);
-
-    List<Widget> detailRows = [
-      _buildDetailRow('Tenant', tenantName),
-      _spacer(),
-      _buildDetailRow('Room', roomName),
-      _spacer(),
-      _buildDetailRow('Consumption', '$consumption kWh'),
-      _spacer(),
-      _buildDetailRow('Electric Charges', currencyFormat.format(bill.electricCharges)),
-      _spacer(),
-      _buildDetailRow('Room Charges', currencyFormat.format(bill.roomCharges)),
-    ];
-
-    if (bill.additionalCharges.isNotEmpty) {
-      buildChargesDetails(detailRows, bill.additionalCharges);
-    }
-
-    detailRows.addAll([
-      _spacer(),
-      _buildDivider(),
-      _spacer(),
-      _buildDetailRow('Total Amount', currencyFormat.format(bill.totalAmount), semanticsId: 'bill-details-total'),
-      _spacer(),
-      _buildDetailRow('Date', date),
-    ]);
-
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: detailRows);
-  }
-
-  Widget _buildDetailRow(String label, String value, {String? semanticsId}) {
-    final row = Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
+  Widget _row(BuildContext context, String label, String value, {bool emphasized = false, String? semanticsId}) {
+    final theme = Theme.of(context);
+    final style = emphasized ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: 16),
+          Text(
             value,
             textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w400),
+            style: style?.copyWith(fontFeatures: AppTheme.tabularFigures),
           ),
-        ),
-      ],
-    );
-    return semanticsId == null ? row : Semantics(container: true, identifier: semanticsId, child: row);
-  }
-
-  void buildChargesDetails(List<Widget> detailRows, List<AdditionalCharge> charges) {
-    final currencyFormat = NumberFormat.currency(locale: 'en_PH', symbol: '₱', decimalDigits: 0);
-    final additionalCharges = charges.where((c) => c.amount >= 0).toList();
-    final discounts = charges.where((c) => c.amount < 0).toList();
-
-    if (additionalCharges.isNotEmpty) {
-      detailRows.add(const SizedBox(height: 12));
-      detailRows.add(const Text('Additional Charges', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)));
-      detailRows.add(const SizedBox(height: 8));
-
-      for (final charge in additionalCharges) {
-        detailRows.add(_buildChargeRow(charge.description, currencyFormat.format(charge.amount)));
-      }
-    }
-
-    if (discounts.isNotEmpty) {
-      detailRows.add(const SizedBox(height: 16));
-      detailRows.add(const Text('Discounts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)));
-      detailRows.add(const SizedBox(height: 8));
-
-      for (final charge in discounts) {
-        detailRows.add(_buildChargeRow(charge.description, currencyFormat.format(charge.amount.abs())));
-      }
-    }
-  }
-
-  Widget _buildChargeRow(String description, String amount) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              description.isNotEmpty ? description : '-',
-              style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
-            ),
-          ),
-          Text(amount),
         ],
       ),
     );
-  }
-
-  Widget _buildCloseButton(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.blue.shade800,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Close', style: TextStyle(color: Colors.white, fontSize: 16)),
-      ),
-    );
+    return semanticsId == null ? row : Semantics(container: true, identifier: semanticsId, child: row);
   }
 }

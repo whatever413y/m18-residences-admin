@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:m18_residences_shared/m18_residences_shared.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class ReadingDetailsDialog extends StatelessWidget {
   final Reading reading;
@@ -10,93 +10,56 @@ class ReadingDetailsDialog extends StatelessWidget {
 
   const ReadingDetailsDialog({super.key, required this.reading, required this.getTenantName, required this.getRoomName, required this.dateFormat});
 
-  Widget _buildDetailRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w400),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 12,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildTitle(),
-                const SizedBox(height: 16),
-                _buildDivider(),
-                const SizedBox(height: 16),
-                _buildDetails(),
-                const SizedBox(height: 24),
-                _buildCloseButton(context),
-              ],
+    final theme = Theme.of(context);
+    final compact = context.windowSize.isCompact;
+    Widget row(String label, String value, {bool emphasized = false}) {
+      final style = emphasized ? theme.textTheme.titleMedium : theme.textTheme.bodyMedium;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Expanded(child: Text(label, style: style)),
+            const SizedBox(width: 16),
+            Text(
+              value,
+              textAlign: TextAlign.right,
+              style: style?.copyWith(fontFeatures: AppTheme.tabularFigures),
             ),
+          ],
+        ),
+      );
+    }
+
+    return Dialog(
+      insetPadding: compact ? const EdgeInsets.all(12) : const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Reading Details', style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 4),
+              Text(getTenantName(reading.tenantId), style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 2),
+              Text('${getRoomName(reading.roomId)} · ${dateFormat.format(reading.createdAt)}', style: theme.textTheme.bodySmall),
+              const SizedBox(height: 20),
+              row('Previous Reading', '${formatCount(reading.prevReading)} kWh'),
+              row('Current Reading', '${formatCount(reading.currReading)} kWh'),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider()),
+              row('Consumption', '${formatCount(reading.consumption)} kWh', emphasized: true),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTitle() {
-    return Text(
-      'Reading Details',
-      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(color: Colors.grey.shade300, thickness: 1);
-  }
-
-  Widget _buildDetails() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildDetailRow('Tenant', getTenantName(reading.tenantId)),
-        const SizedBox(height: 12),
-        _buildDetailRow('Room', getRoomName(reading.roomId)),
-        const SizedBox(height: 12),
-        _buildDetailRow('Previous Reading', '${reading.prevReading} kWh'),
-        const SizedBox(height: 12),
-        _buildDetailRow('Current Reading', '${reading.currReading} kWh'),
-        const SizedBox(height: 12),
-        _buildDetailRow('Consumption', '${reading.consumption} kWh'),
-        const SizedBox(height: 12),
-        _buildDetailRow('Date', dateFormat.format(reading.createdAt)),
-      ],
-    );
-  }
-
-  Widget _buildCloseButton(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: Colors.blue.shade800,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Close', style: TextStyle(color: Colors.white, fontSize: 16)),
       ),
     );
   }

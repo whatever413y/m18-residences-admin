@@ -3,14 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
-import 'package:m18_residences_admin/features/auth/auth_event.dart';
-import 'package:m18_residences_admin/features/auth/auth_state.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_bloc.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_event.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_state.dart';
 import 'package:m18_residences_admin/features/billing/widgets/billing_details_dialog.dart';
 import 'package:m18_residences_admin/features/billing/widgets/billing_form_dialog.dart';
+import 'package:m18_residences_admin/features/shell/admin_shell.dart';
+import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/responsive_table.dart';
@@ -18,6 +17,8 @@ import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class BillingsPage extends StatefulWidget {
+  const BillingsPage({super.key});
+
   @override
   BillingsPageState createState() => BillingsPageState();
 }
@@ -54,11 +55,32 @@ class BillingsPageState extends State<BillingsPage> {
   /// Recomputed only when the data, the filters or the sort change, not on every build.
   _BillsView? _view;
 
+  late final ValueNotifier<BillFilter?> _shellFilter;
+
   @override
   void initState() {
     super.initState();
-    context.read<AuthBloc>().add(CheckAuthStatus());
-    billingBloc.add(LoadBills());
+    // Search and the dashboard open this page filtered to a tenant or a room (all their bills, any date).
+    _shellFilter = AdminShell.of(context).billFilter..addListener(_applyShellFilter);
+  }
+
+  @override
+  void dispose() {
+    _shellFilter.removeListener(_applyShellFilter);
+    super.dispose();
+  }
+
+  void _applyShellFilter() {
+    final filter = _shellFilter.value;
+    if (filter == null) return;
+    setState(() {
+      _filterTenantId = filter.tenantId;
+      _filterRoomId = filter.roomId;
+      _filterYear = null;
+      _filterMonth = null;
+      _showActiveOnly = false;
+    });
+    _shellFilter.value = null;
   }
 
   /// The room a bill is for: its reading's, else the tenant's current room.
@@ -133,7 +155,7 @@ class BillingsPageState extends State<BillingsPage> {
           for (final charge in bill.additionalCharges)
             Text(
               '${_currency.format(charge.amount)} — ${charge.description.isNotEmpty ? charge.description : '-'}',
-              style: TextStyle(color: charge.amount < 0 ? Colors.red : null),
+              style: TextStyle(color: charge.amount < 0 ? Theme.of(context).colorScheme.error : null),
             ),
         ],
       ),
@@ -170,85 +192,39 @@ class BillingsPageState extends State<BillingsPage> {
     return completer.future;
   }
 
-  void _showBillingDetailsDialog(Bill bill, _BillsView view) {
-    final tenant = view.tenants[bill.tenantId];
-    final room = view.rooms[_roomIdOf(bill, view.tenants)];
-
-    showSelectableDialog(
-      context: context,
-      builder: (_) => BillingDetailsDialog(
-        bill: bill,
-        tenantName: tenant?.name ?? 'Unknown Tenant',
-        roomName: room?.name ?? 'Unknown Room',
-        consumption: bill.consumption.toString(),
-        date: _dateFormat.format(bill.createdAt),
-      ),
-    );
-  }
+  void _showBillingDetailsDialog(Bill bill, _BillsView view) => showBillDetails(context, bill, tenants: view.tenants, rooms: view.rooms);
 
   /// Only data loads change what the page shows; action results are reported by the listener.
   static bool _shows(BillingState state) => state is BillingInitial || state is BillingLoading || state is BillingLoaded || state is BillingError;
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Scaffold(
-        appBar: CustomAppBar(
-          title: 'Billing',
-          showRefresh: true,
-          onRefresh: () => billingBloc.add(LoadBills()),
-          actions: [
-            buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value)),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: BlocBuilder<AuthBloc, AuthState>(
-          buildWhen: (previous, current) => previous.runtimeType != current.runtimeType,
-          builder: (context, authState) {
-            if (authState is Unauthenticated) {
-              return ErrorView(message: authState.message);
-            }
-            return BlocListener<BillingBloc, BillingState>(
-              listener: (context, state) {
-                if (state is BillingActionFailed) {
-                  CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
-                } else if (state is BillingError) {
-                  CustomSnackbar.hide(context);
-                  // A failed load may mean the session expired; the auth check then shows the login error.
-                  context.read<AuthBloc>().add(CheckAuthStatus());
-                } else if (state is AddSuccess) {
-                  CustomSnackbar.show(context, 'Bill created', type: SnackBarType.success);
-                } else if (state is UpdateSuccess) {
-                  CustomSnackbar.show(context, 'Bill updated', type: SnackBarType.success);
-                } else if (state is DeleteSuccess) {
-                  CustomSnackbar.show(context, 'Bill deleted', type: SnackBarType.success);
-                }
-              },
-              child: BlocBuilder<BillingBloc, BillingState>(
-                buildWhen: (_, state) => _shows(state),
-                builder: (context, state) {
-                  if (state is BillingError) {
-                    return ErrorView(message: state.message, onRetry: () => billingBloc.add(LoadBills()));
-                  }
-                  if (state is! BillingLoaded) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return _buildContent(context, _viewOf(state));
-                },
-              ),
-            );
-          },
-        ),
-        floatingActionButton: BlocBuilder<BillingBloc, BillingState>(
-          buildWhen: (_, state) => _shows(state),
-          builder: (context, state) => FloatingActionButton.extended(
-            // Disabled until the billing data has loaded.
-            onPressed: state is BillingLoaded ? () => _showBillingDialog(state) : null,
-            backgroundColor: state is BillingLoaded ? null : Colors.grey,
-            label: const Text('Generate New Bill'),
-            icon: const Icon(Icons.add),
-          ),
+    // Results of creating, updating and deleting bills are reported by the shell.
+    return Scaffold(
+      appBar: AdminAppBar(
+        title: 'Billing',
+        onRefresh: () => billingBloc.add(LoadBills()),
+        actions: [buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value))],
+      ),
+      body: BlocBuilder<BillingBloc, BillingState>(
+        buildWhen: (_, state) => _shows(state),
+        builder: (context, state) {
+          if (state is BillingError) {
+            return ErrorView(message: state.message, onRetry: () => billingBloc.add(LoadBills()));
+          }
+          if (state is! BillingLoaded) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return _buildContent(context, _viewOf(state));
+        },
+      ),
+      floatingActionButton: BlocBuilder<BillingBloc, BillingState>(
+        buildWhen: (_, state) => _shows(state),
+        builder: (context, state) => FloatingActionButton.extended(
+          // Disabled until the billing data has loaded.
+          onPressed: state is BillingLoaded ? () => _showBillingDialog(state) : null,
+          label: const Text('Generate New Bill'),
+          icon: const Icon(Icons.add),
         ),
       ),
     );
@@ -304,10 +280,7 @@ class BillingsPageState extends State<BillingsPage> {
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: const [
-                          Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Center(child: Text('No bills found')),
-                          ),
+                          EmptyState(icon: Icons.receipt_long_outlined, title: 'No bills found', message: 'Try other filters, or generate a bill.'),
                         ],
                       )
                     : ResponsiveTable<Bill>(
@@ -341,13 +314,13 @@ class BillingsPageState extends State<BillingsPage> {
           identifier: 'bill-edit-$tenantName',
           child: IconButton(
             tooltip: 'Edit bill',
-            icon: const Icon(Icons.edit, color: Colors.blue),
+            icon: const Icon(Icons.edit_outlined),
             onPressed: () => _showBillingDialog(view.state, bill: bill),
           ),
         ),
         IconButton(
           tooltip: 'Delete bill',
-          icon: const Icon(Icons.delete, color: Colors.red),
+          icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
           onPressed: () => showConfirmationAction(
             context: context,
             messenger: ScaffoldMessenger.of(context),

@@ -4,6 +4,21 @@ The admin page of M18 Residences (https://admin.m18-residences.workers.dev): roo
 bills with the tenant's payment image and the owner's receipt, and the payment QR codes tenants pay with. Flutter web, hosted as a static-assets Cloudflare Worker (`admin`). The production site
 is behind Cloudflare Access: log in with an allowed email (one-time code), then with the admin login.
 
+## Screens
+
+After login, `lib/features/shell/admin_shell.dart` shows the pages: **Dashboard**, **Verify**, **Billing**,
+**Electric Readings**, **Tenants**, **Rooms** and **Payment QR Codes**, as an extended side rail on desktops, a
+rail on tablets and a bottom bar on phones (Home, Verify, Billing, Readings; the rest and Logout under **More**).
+Opening a page reloads its data; pages stay built, so filters are kept. Light and dark follow the system
+(`AppTheme.light` / `AppTheme.dark` from `m18_residences_shared`).
+
+- **Dashboard** (`lib/features/dashboard/`): for the latest bill month, billed, collected (bills with a receipt),
+  outstanding and occupancy (rooms with an active tenant); the bills that need attention (payments to verify, then
+  unpaid); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
+- **Verify** (`lib/features/verify/`): bills with a tenant's payment and no receipt; View payment, then **Attach
+  receipt** (the same upload as the Update Bill form) marks the bill Paid. The rail shows how many are waiting.
+- **Search** (every page's app bar): tenants and rooms; picking one opens Billing with all of their bills.
+
 ## Receipts and payments
 
 A bill has two optional files: the **payment** image from the tenant (they upload it in the tenant app; the admin

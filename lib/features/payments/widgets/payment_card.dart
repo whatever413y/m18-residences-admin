@@ -78,9 +78,19 @@ class _PaymentCardState extends State<PaymentCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_label, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text(_label, style: theme.textTheme.titleMedium),
             const SizedBox(height: 12),
-            SizedBox(height: 200, child: Center(child: _preview())),
+            // QR codes on white, also in dark mode.
+            Container(
+              height: 200,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Center(child: _preview()),
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -113,7 +123,7 @@ class _PaymentCardState extends State<PaymentCard> {
 
   Widget _preview() {
     final file = _file;
-    if (file == null) return const Text('No QR code uploaded yet');
+    if (file == null) return const Text('No QR code uploaded yet', style: TextStyle(color: Color(0xFF475569)));
     return FutureBuilder<SignedFile>(
       future: file,
       builder: (context, snapshot) {

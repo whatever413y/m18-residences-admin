@@ -363,7 +363,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
               final remove = _additionalCharges.length > 1
                   ? IconButton(
                       tooltip: 'Remove charge',
-                      icon: const Icon(Icons.remove_circle, color: Colors.red),
+                      icon: Icon(Icons.remove_circle_outline, color: Theme.of(context).colorScheme.error),
                       onPressed: () => _removeCharge(index),
                     )
                   : null;

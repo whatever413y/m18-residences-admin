@@ -96,10 +96,7 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
     final isEditing = widget.room != null;
 
     return [
-      TextButton(
-        onPressed: () => Navigator.of(context).pop(null),
-        child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-      ),
+      TextButton(onPressed: () => Navigator.of(context).pop(null), child: const Text('Cancel')),
       Semantics(
         container: true,
         identifier: 'room-save',

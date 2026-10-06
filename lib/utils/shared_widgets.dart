@@ -5,18 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
-Widget buildActiveToggleFilter({
-  required bool showActiveOnly,
-  required ValueChanged<bool> onChanged,
-  Color activeColor = Colors.white,
-  TextStyle labelStyle = const TextStyle(color: Colors.white),
-}) {
-  return Row(
-    children: [
-      Text('Show Active Only', style: labelStyle),
-      Switch(value: showActiveOnly, onChanged: onChanged, activeThumbColor: activeColor),
-    ],
-  );
+/// "Active only" filter chip: hides inactive tenants (and their readings and bills) while selected.
+Widget buildActiveToggleFilter({required bool showActiveOnly, required ValueChanged<bool> onChanged}) {
+  return FilterChip(label: const Text('Active only'), selected: showActiveOnly, onSelected: onChanged);
 }
 
 Widget buildRoomFilter({

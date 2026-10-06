@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_admin/utils/entity_card.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class TenantCard extends StatelessWidget {
@@ -12,43 +13,24 @@ class TenantCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('MMMM d, y');
-
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tenant.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  SizedBox(height: 6),
-                  Text('Room: ${room.name}\nJoined: ${dateFormat.format(tenant.joinDate)}'),
-                ],
-              ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.blue),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
-          ],
+    final theme = Theme.of(context);
+    return EntityCard(
+      leading: CircleAvatar(
+        backgroundColor: tenant.isActive ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest,
+        child: Text(
+          tenant.name.isEmpty ? '?' : tenant.name[0],
+          style: TextStyle(
+            color: tenant.isActive ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
+      title: tenant.name,
+      subtitle: '${room.name} · Joined ${DateFormat('MMM d, y').format(tenant.joinDate)}${tenant.isActive ? '' : ' · Inactive'}',
+      editTooltip: 'Edit tenant',
+      deleteTooltip: 'Delete tenant',
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }

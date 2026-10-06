@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m18_residences_admin/utils/entity_card.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class RoomCard extends StatelessWidget {
@@ -10,41 +11,18 @@ class RoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(room.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const SizedBox(height: 6),
-                  Text('Rent: ₱${room.rent.toString()}'),
-                ],
-              ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
-          ],
-        ),
+    final scheme = Theme.of(context).colorScheme;
+    return EntityCard(
+      leading: CircleAvatar(
+        backgroundColor: scheme.primaryContainer,
+        child: Icon(Icons.meeting_room_outlined, color: scheme.onPrimaryContainer),
       ),
+      title: room.name,
+      subtitle: 'Rent ${formatPeso(room.rent)} a month',
+      editTooltip: 'Edit room',
+      deleteTooltip: 'Delete room',
+      onEdit: onEdit,
+      onDelete: onDelete,
     );
   }
 }

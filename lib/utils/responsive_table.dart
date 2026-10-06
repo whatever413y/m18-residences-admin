@@ -56,44 +56,56 @@ class ResponsiveTable<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SelectionContainer.disabled(
-    child: LayoutBuilder(builder: (context, constraints) => constraints.maxWidth >= tableMinWidth ? _table(context) : _cards(context)),
+    child: LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= tableMinWidth ? _table(context, constraints.maxWidth) : _cards(context),
+    ),
   );
 
-  Widget _table(BuildContext context) {
+  Widget _table(BuildContext context, double width) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
-          showCheckboxColumn: false,
-          columnSpacing: 28,
-          sortColumnIndex: sortColumn + 1,
-          sortAscending: sortAscending,
-          // Rows grow with multi-line cells (e.g. several additional charges).
-          dataRowMaxHeight: double.infinity,
-          columns: [
-            const DataColumn(label: Text('Actions')),
-            for (final (i, column) in columns.indexed)
-              DataColumn(
-                label: Text(column.label),
-                numeric: column.numeric,
-                onSort: column.sortKey == null ? null : (_, ascending) => onSort(i, ascending),
-              ),
-          ],
-          rows: [
-            for (final item in items)
-              DataRow(
-                onSelectChanged: (_) => onTap(item),
-                cells: [DataCell(actions(item)), for (final column in columns) DataCell(column.cell(item))],
-              ),
-          ],
+        // At least as wide as the page, so the table's card spans it.
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: width),
+          child: DataTable(
+            showCheckboxColumn: false,
+            columnSpacing: 28,
+            decoration: BoxDecoration(
+              color: AppTheme.panelColor(Theme.of(context).colorScheme),
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            clipBehavior: Clip.antiAlias,
+            sortColumnIndex: sortColumn + 1,
+            sortAscending: sortAscending,
+            // Rows grow with multi-line cells (e.g. several additional charges).
+            dataRowMaxHeight: double.infinity,
+            columns: [
+              const DataColumn(label: Text('Actions')),
+              for (final (i, column) in columns.indexed)
+                DataColumn(
+                  label: Text(column.label),
+                  numeric: column.numeric,
+                  onSort: column.sortKey == null ? null : (_, ascending) => onSort(i, ascending),
+                ),
+            ],
+            rows: [
+              for (final item in items)
+                DataRow(
+                  onSelectChanged: (_) => onTap(item),
+                  cells: [DataCell(actions(item)), for (final column in columns) DataCell(column.cell(item))],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _cards(BuildContext context) {
-    final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700);
+    final labelStyle = Theme.of(context).textTheme.bodySmall;
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: items.length + 1,
@@ -104,35 +116,51 @@ class ResponsiveTable<T> extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           child: InkWell(
             onTap: () => onTap(item),
-            borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Expanded(
-                        child: DefaultTextStyle.merge(
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          child: columns[titleColumn].cell(item),
-                        ),
+                        child: DefaultTextStyle.merge(style: Theme.of(context).textTheme.titleMedium, child: columns[titleColumn].cell(item)),
                       ),
                       actions(item),
                     ],
                   ),
-                  for (final (i, column) in columns.indexed)
-                    if (i != titleColumn)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6, right: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  // Label above value, two (or more) per row, so a card stays short on phones.
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, right: 8),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final perRow = (constraints.maxWidth / 170).floor().clamp(2, 4);
+                        final width = (constraints.maxWidth - 16 * (perRow - 1)) / perRow;
+                        return Wrap(
+                          spacing: 16,
+                          runSpacing: 10,
                           children: [
-                            SizedBox(width: 128, child: Text(column.label, style: labelStyle)),
-                            Expanded(child: column.cell(item)),
+                            for (final (i, column) in columns.indexed)
+                              if (i != titleColumn)
+                                SizedBox(
+                                  width: width,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(column.label, style: labelStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      const SizedBox(height: 2),
+                                      DefaultTextStyle.merge(
+                                        style: const TextStyle(fontFeatures: AppTheme.tabularFigures),
+                                        child: column.cell(item),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                           ],
-                        ),
-                      ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),

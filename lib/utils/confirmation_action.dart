@@ -15,9 +15,10 @@ Future<bool> showConfirmationAction({
       content: Text(confirmContent),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-        TextButton(
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError),
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Confirm', style: TextStyle(color: Colors.red)),
+          child: const Text('Confirm'),
         ),
       ],
     ),

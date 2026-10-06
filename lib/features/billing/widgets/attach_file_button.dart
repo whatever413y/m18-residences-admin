@@ -125,7 +125,7 @@ class _AttachFileButtonState extends State<AttachFileButton> {
                 container: true,
                 identifier: 'bill-remove-$subject',
                 child: TextButton.icon(
-                  style: TextButton.styleFrom(foregroundColor: Colors.red.shade800, minimumSize: const Size(48, 48)),
+                  style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
                   onPressed: _remove,
                   icon: const Icon(Icons.delete_outline),
                   label: const Text('Remove'),

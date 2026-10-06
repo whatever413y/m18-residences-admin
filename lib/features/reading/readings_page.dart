@@ -5,12 +5,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_event.dart';
-import 'package:m18_residences_admin/features/auth/auth_state.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_bloc.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_event.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_state.dart';
 import 'package:m18_residences_admin/features/reading/widgets/reading_details_dialog.dart';
 import 'package:m18_residences_admin/features/reading/widgets/reading_form_dialog.dart';
+import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_add_button.dart';
 import 'package:m18_residences_admin/utils/custom_snackbar.dart';
@@ -55,13 +55,6 @@ class ReadingsPageState extends State<ReadingsPage> {
 
   /// Recomputed only when the data, the filters or the sort change, not on every build.
   _ReadingsView? _view;
-
-  @override
-  void initState() {
-    super.initState();
-    context.read<AuthBloc>().add(CheckAuthStatus());
-    readingBloc.add(LoadReadings());
-  }
 
   _ReadingsView _viewOf(ReadingLoaded state) {
     final settings = (_showActiveOnly, _filterRoomId, _filterTenantId, _filterYear, _filterMonth, _sortColumn, _sortAscending);
@@ -139,65 +132,49 @@ class ReadingsPageState extends State<ReadingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: AppTheme.lightTheme,
-      child: Scaffold(
-        appBar: CustomAppBar(
-          title: 'Electricity Readings',
-          showRefresh: true,
-          onRefresh: () => readingBloc.add(LoadReadings()),
-          actions: [
-            buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value)),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: BlocBuilder<AuthBloc, AuthState>(
-          buildWhen: (previous, current) => previous.runtimeType != current.runtimeType,
-          builder: (context, authState) {
-            if (authState is Unauthenticated) {
-              return ErrorView(message: authState.message);
-            }
-
-            return BlocListener<ReadingBloc, ReadingState>(
-              listener: (context, state) {
-                if (state is ReadingActionFailed) {
-                  CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
-                } else if (state is ReadingError) {
-                  CustomSnackbar.hide(context);
-                  // A failed load may mean the session expired; the auth check then shows the login error.
-                  context.read<AuthBloc>().add(CheckAuthStatus());
-                } else if (state is AddSuccess) {
-                  CustomSnackbar.show(context, 'Reading created', type: SnackBarType.success);
-                } else if (state is UpdateSuccess) {
-                  CustomSnackbar.show(context, 'Reading updated', type: SnackBarType.success);
-                } else if (state is DeleteSuccess) {
-                  CustomSnackbar.show(context, 'Reading deleted', type: SnackBarType.success);
-                }
-              },
-              child: BlocBuilder<ReadingBloc, ReadingState>(
-                buildWhen: (_, state) => _shows(state),
-                builder: (context, state) {
-                  if (state is ReadingError) {
-                    return ErrorView(message: state.message, onRetry: () => readingBloc.add(LoadReadings()));
-                  }
-                  if (state is! ReadingLoaded) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return _buildContent(context, _viewOf(state));
-                },
-              ),
-            );
-          },
-        ),
-        floatingActionButton: BlocBuilder<ReadingBloc, ReadingState>(
+    return Scaffold(
+      appBar: AdminAppBar(
+        title: 'Electric Readings',
+        onRefresh: () => readingBloc.add(LoadReadings()),
+        actions: [buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value))],
+      ),
+      body: BlocListener<ReadingBloc, ReadingState>(
+        listener: (context, state) {
+          if (state is ReadingActionFailed) {
+            CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+          } else if (state is ReadingError) {
+            CustomSnackbar.hide(context);
+            // A failed load may mean the session expired; the auth check then shows the login error.
+            context.read<AuthBloc>().add(CheckAuthStatus());
+          } else if (state is AddSuccess) {
+            CustomSnackbar.show(context, 'Reading created', type: SnackBarType.success);
+          } else if (state is UpdateSuccess) {
+            CustomSnackbar.show(context, 'Reading updated', type: SnackBarType.success);
+          } else if (state is DeleteSuccess) {
+            CustomSnackbar.show(context, 'Reading deleted', type: SnackBarType.success);
+          }
+        },
+        child: BlocBuilder<ReadingBloc, ReadingState>(
           buildWhen: (_, state) => _shows(state),
           builder: (context, state) {
-            if (state is ReadingLoaded) {
-              return CustomAddButton(onPressed: () => _showReadingDialog(state), label: 'New Reading');
+            if (state is ReadingError) {
+              return ErrorView(message: state.message, onRetry: () => readingBloc.add(LoadReadings()));
             }
-            return const SizedBox.shrink();
+            if (state is! ReadingLoaded) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return _buildContent(context, _viewOf(state));
           },
         ),
+      ),
+      floatingActionButton: BlocBuilder<ReadingBloc, ReadingState>(
+        buildWhen: (_, state) => _shows(state),
+        builder: (context, state) {
+          if (state is ReadingLoaded) {
+            return CustomAddButton(onPressed: () => _showReadingDialog(state), label: 'New Reading');
+          }
+          return const SizedBox.shrink();
+        },
       ),
     );
   }
@@ -250,10 +227,7 @@ class ReadingsPageState extends State<ReadingsPage> {
                     ? ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         children: const [
-                          Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Center(child: Text('No readings found for the selected filters.')),
-                          ),
+                          EmptyState(icon: Icons.bolt_outlined, title: 'No readings found', message: 'Try other filters, or add a reading.'),
                         ],
                       )
                     : ResponsiveTable<Reading>(
@@ -273,12 +247,12 @@ class ReadingsPageState extends State<ReadingsPage> {
                           children: [
                             IconButton(
                               tooltip: 'Edit reading',
-                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              icon: const Icon(Icons.edit_outlined),
                               onPressed: () => _showReadingDialog(state, reading: reading),
                             ),
                             IconButton(
                               tooltip: 'Delete reading',
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                               onPressed: () => showConfirmationAction(
                                 context: context,
                                 messenger: ScaffoldMessenger.of(context),

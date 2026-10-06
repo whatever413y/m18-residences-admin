@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 enum SnackBarType { success, error, info, loading }
 
@@ -36,30 +37,28 @@ class CustomSnackbar {
 
   static SnackBar _buildSnackBar(BuildContext context, String message, SnackBarType type, Duration duration) {
     final theme = Theme.of(context);
-
-    final Map<SnackBarType, Color> colorMap = {
-      SnackBarType.success: Colors.green.shade600,
-      SnackBarType.error: Colors.red.shade600,
-      SnackBarType.info: Colors.blue.shade600,
-      SnackBarType.loading: Colors.grey.shade800,
+    final scheme = theme.colorScheme;
+    final status = StatusColors.of(context);
+    final isError = type == SnackBarType.error;
+    // Errors on the error color; everything else on the theme's inverse surface with a colored icon.
+    final background = isError ? scheme.error : scheme.inverseSurface;
+    final contentColor = isError ? scheme.onError : scheme.onInverseSurface;
+    final iconColor = switch (type) {
+      SnackBarType.success => scheme.brightness == Brightness.light ? status.paid : status.onPaid,
+      SnackBarType.error => scheme.onError,
+      SnackBarType.info || SnackBarType.loading => scheme.inversePrimary,
     };
-
-    final Map<SnackBarType, IconData> iconMap = {
-      SnackBarType.success: Icons.check_circle_outline,
-      SnackBarType.error: Icons.error_outline,
-      SnackBarType.info: Icons.info_outline,
-    };
-
-    final Color contentColor = theme.snackBarTheme.contentTextStyle?.color ?? theme.colorScheme.onPrimary;
 
     final Widget leading = type == SnackBarType.loading
-        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(contentColor)))
-        : Icon(iconMap[type], color: contentColor);
+        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(iconColor)))
+        : Icon(switch (type) {
+            SnackBarType.success => Icons.check_circle,
+            SnackBarType.error => Icons.error_outline,
+            _ => Icons.info_outline,
+          }, color: iconColor);
 
     return SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: colorMap[type],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: background,
       margin: const EdgeInsets.all(16),
       // A loading toast is replaced by the result's toast; the limit only guards against a result that never comes.
       duration: type == SnackBarType.loading ? const Duration(seconds: 30) : duration,
@@ -68,7 +67,7 @@ class CustomSnackbar {
           leading,
           const SizedBox(width: 12),
           Expanded(
-            child: Text(message, style: theme.snackBarTheme.contentTextStyle ?? TextStyle(color: contentColor)),
+            child: Text(message, style: theme.textTheme.bodyMedium?.copyWith(color: contentColor)),
           ),
         ],
       ),
