@@ -362,7 +362,7 @@ class BillingsPageState extends State<BillingsPage> {
             context: context,
             messenger: ScaffoldMessenger.of(context),
             confirmTitle: 'Delete Bill',
-            confirmContent: 'Are you sure you want to delete this bill? Its receipt and payment are deleted too.',
+            confirmContent: 'Are you sure you want to delete this bill? Its receipt and payment images are kept in the archive.',
             onConfirmed: () => _deleteBill(bill.id),
           ),
         ),

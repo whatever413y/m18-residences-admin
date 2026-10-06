@@ -123,7 +123,7 @@ class BillingDetailsDialog extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Remove Payment'),
-        content: Text("Remove $tenantName's payment image from this bill? The file is deleted."),
+        content: Text("Remove $tenantName's payment image from this bill? The file is kept in the archive."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
