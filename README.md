@@ -19,6 +19,8 @@ Opening a page reloads its data; pages stay built, so filters are kept. Light an
   receipt** (the same upload as the Update Bill form) marks the bill Paid. The rail shows how many are waiting.
 - **Search** (every page's app bar): tenants and rooms; picking one opens Billing with all of their bills.
 
+**Logo and icons:** the roofline M (teal mark on dark slate, so the admin tab stands apart from the tenant app). `web/icons/logo.svg` and `logo-maskable.svg` are the masters; `web/favicon.svg` is a copy, and the PNGs (`favicon.png`, `icons/Icon-*.png`, `icons/apple-touch-icon.png`) are rendered from them at their sizes in Chrome. In the app, `BrandMark` from `m18_residences_shared` draws the same mark.
+
 ## Receipts and payments
 
 A bill has two optional files: the **payment** image from the tenant (they upload it in the tenant app; the admin
