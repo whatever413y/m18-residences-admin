@@ -149,13 +149,15 @@ Widget buildFilterBar(BuildContext context, {required Widget room, required Widg
 }
 
 /// "View receipt" / "View payment" button for a bill's file (nothing when there is none); the signed URL is
-/// fetched when it is opened.
-Widget buildBillFile(BuildContext context, BillFileKind kind, String? tenantName, String? fileUrl) {
+/// fetched when it is opened. [iconOnly] and [label] as in [BillFileButton].
+Widget buildBillFile(BuildContext context, BillFileKind kind, String? tenantName, String? fileUrl, {bool iconOnly = false, String? label}) {
   final authApi = context.read<AuthBloc>().authApi;
   return BillFileButton(
     kind: kind,
     tenantName: tenantName,
     fileUrl: fileUrl,
+    iconOnly: iconOnly,
+    label: label,
     fetchSignedFile: switch (kind) {
       BillFileKind.receipt => authApi.signedReceiptUrl,
       BillFileKind.payment => authApi.signedTenantPaymentUrl,

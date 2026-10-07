@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_admin/features/billing/widgets/bill_file_row.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -20,8 +21,8 @@ Future<void> showBillDetails(BuildContext context, Bill bill, {required Map<int,
   );
 }
 
-/// A bill's details: who and when, every charge down to the total, the status, and View buttons for the tenant's
-/// payment and the receipt (attached, changed and removed in the Update Bill form).
+/// A bill's details: who and when, every charge down to the total, the status, and the tenant's payment and the
+/// receipt as rows with View (attached, changed and removed in the Update Bill form).
 class BillingDetailsDialog extends StatelessWidget {
   final Bill bill;
   final String tenantName;
@@ -40,59 +41,66 @@ class BillingDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return AppModal(
+      leading: AppModal.icon(context, Icons.receipt_long_outlined),
       overline: 'Billing Details',
       title: tenantName,
       subtitle: '$roomName · $date',
       trailing: Semantics(container: true, identifier: 'bill-details-status', child: BillStatusChip(bill.status)),
-      maxWidth: 480,
+      maxWidth: 520,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _section(context, 'Charges'),
-          _row(context, 'Consumption', '$consumption kWh'),
-          _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
-          _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
-          for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
-            _row(context, charge.description.isNotEmpty ? charge.description : 'Additional charge', formatPeso(charge.amount)),
-          for (final charge in bill.additionalCharges.where((c) => c.amount < 0))
-            _row(context, '${charge.description.isNotEmpty ? charge.description : 'Discount'} (discount)', formatPeso(charge.amount)),
-          const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
-          _row(context, 'Total Amount', formatPeso(bill.totalAmount), emphasized: true, semanticsId: 'bill-details-total'),
-          const SizedBox(height: 20),
-          _section(context, 'Payment from tenant'),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (!bill.hasPayment) Text('No payment uploaded', style: muted),
-              Semantics(
-                container: true,
-                identifier: 'bill-view-payment',
-                child: buildBillFile(context, BillFileKind.payment, tenantName, bill.paymentUrl),
-              ),
-            ],
+          AppModalSection(
+            label: 'Charges',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _row(context, 'Consumption', '$consumption kWh'),
+                _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
+                _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
+                for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
+                  _row(context, charge.description.isNotEmpty ? charge.description : 'Additional charge', formatPeso(charge.amount)),
+                for (final charge in bill.additionalCharges.where((c) => c.amount < 0))
+                  _row(context, '${charge.description.isNotEmpty ? charge.description : 'Discount'} (discount)', formatPeso(charge.amount)),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider()),
+                _row(context, 'Total Amount', formatPeso(bill.totalAmount), emphasized: true, semanticsId: 'bill-details-total'),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          _section(context, 'Receipt from owner'),
-          if (bill.hasReceipt)
-            Align(alignment: Alignment.centerLeft, child: buildBillFile(context, BillFileKind.receipt, tenantName, bill.receiptUrl))
-          else
-            Text('No receipt yet: attach one with Edit bill or in Verify', style: muted),
+          const SizedBox(height: 20),
+          AppModalSection(
+            label: 'Files',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _file(context, BillFileKind.payment, bill.paymentUrl, missing: 'No payment uploaded'),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
+                _file(context, BillFileKind.receipt, bill.receiptUrl, missing: 'No receipt yet: attach one with Edit bill or in Verify'),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _section(BuildContext context, String title) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(title, style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+  /// A file's row: "Attached" with View (test id `bill-view-<kind>`), or [missing].
+  Widget _file(BuildContext context, BillFileKind kind, String? fileUrl, {required String missing}) {
+    final present = fileUrl?.isNotEmpty ?? false;
+    return BillFileRow(
+      kind: kind,
+      present: present,
+      status: Text(present ? 'Attached' : missing),
+      actions: [
+        if (present)
+          Semantics(
+            container: true,
+            identifier: 'bill-view-${kind.subject}',
+            child: buildBillFile(context, kind, tenantName, fileUrl, label: 'View'),
+          ),
+      ],
     );
   }
 

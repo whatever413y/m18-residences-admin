@@ -19,6 +19,7 @@ Future<bool> showConfirmationAction({
       return AppModal(
         leading: AppModal.icon(context, Icons.delete_outline, background: scheme.errorContainer, foreground: scheme.onErrorContainer),
         title: title,
+        tint: scheme.error,
         maxWidth: 440,
         actions: [
           OutlinedButton(autofocus: true, onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),

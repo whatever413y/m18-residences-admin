@@ -108,7 +108,7 @@ class AdminShellState extends State<AdminShell> {
               return AdaptiveScaffold(
                 selectedIndex: _tab.index,
                 onDestinationSelected: (i) => select(AdminTab.values[i]),
-                railHeader: (context, extended) => BrandMark(label: extended ? 'M18 Admin' : null),
+                railHeader: (context, extended) => RailBrand(label: 'M18 Admin', extended: extended),
                 railFooter: (context, extended) => extended
                     ? TextButton.icon(
                         style: TextButton.styleFrom(alignment: Alignment.centerLeft, foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -118,6 +118,7 @@ class AdminShellState extends State<AdminShell> {
                       )
                     : IconButton(tooltip: 'Logout', onPressed: () => LogoutScope.logout(context), icon: const Icon(Icons.logout)),
                 moreSheetFooter: (sheetContext) => [
+                  const ThemeModeTile(),
                   ListTile(
                     leading: const Icon(Icons.logout),
                     title: const Text('Logout'),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class RoomFormDialog extends StatefulWidget {
@@ -10,7 +11,7 @@ class RoomFormDialog extends StatefulWidget {
   State<RoomFormDialog> createState() => _RoomFormDialogState();
 }
 
-class _RoomFormDialogState extends State<RoomFormDialog> {
+class _RoomFormDialogState extends State<RoomFormDialog> with DirtyTracking {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _rentController;
@@ -20,9 +21,17 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.room?.name ?? '');
     _rentController = TextEditingController(text: widget.room != null ? widget.room!.rent.toString() : '');
+    markPristine();
   }
 
+  @override
+  List<Object?> get formSnapshot => [_nameController.text.trim(), _rentController.text.trim()];
+
+  /// A new room needs a name and a rent; an edit, a change.
+  bool _canSave() => widget.room == null ? _nameController.text.trim().isNotEmpty && _rentController.text.trim().isNotEmpty : isDirty;
+
   void _submit() {
+    if (!_canSave()) return;
     if (_formKey.currentState?.validate() ?? false) {
       final data = {'name': _nameController.text.trim(), 'rent': int.parse(_rentController.text.trim())};
       Navigator.of(context).pop(data);
@@ -96,10 +105,13 @@ class _RoomFormDialogState extends State<RoomFormDialog> {
 
     return [
       TextButton(onPressed: () => Navigator.of(context).pop(null), child: const Text('Cancel')),
-      Semantics(
-        container: true,
-        identifier: 'room-save',
-        child: FilledButton(onPressed: _submit, child: Text(isEditing ? 'Save' : 'Add')),
+      FormSaveButton(
+        id: 'room-save',
+        label: isEditing ? 'Save' : 'Add',
+        canSave: _canSave,
+        onPressed: _submit,
+        disabledReason: isEditing ? 'Nothing changed yet' : 'Enter a name and the rent',
+        listenable: Listenable.merge([_nameController, _rentController]),
       ),
     ];
   }

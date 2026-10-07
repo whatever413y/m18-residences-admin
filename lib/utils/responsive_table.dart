@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 /// A column of a [ResponsiveTable]: its label, its cell, and (when sortable) the value it sorts by.
+///
+/// Columns can come and go with the width: the table shows a column only when it is at least [minWidth] wide
+/// (`double.infinity`: cards only), and cards leave out columns with [inCards] false. [tableCell] replaces [cell] in
+/// the table (e.g. a denser version).
 class TableColumn<T> {
   final String label;
   final Widget Function(T item) cell;
+  final Widget Function(T item)? tableCell;
   final Comparable<Object?> Function(T item)? sortKey;
   final bool numeric;
+  final double minWidth;
+  final bool inCards;
 
-  const TableColumn(this.label, this.cell, {this.sortKey, this.numeric = false});
+  const TableColumn(this.label, this.cell, {this.sortKey, this.numeric = false, this.tableCell, this.minWidth = 0, this.inCards = true});
 }
 
 /// [items] sorted by [column] (a copy; equal items keep their order). Unsortable columns leave the order as is.
@@ -24,13 +31,14 @@ List<T> sortItems<T>(List<T> items, TableColumn<T> column, {required bool ascend
   return [for (final (_, _, item) in keyed) item];
 }
 
-/// [items] (already sorted) as a sortable [DataTable] when at least [tableMinWidth] wide (so the table never
-/// scrolls sideways), and as cards otherwise: the [titleColumn] as the card's title, the other columns as
-/// label/value rows, sorted with a "Sort by" menu.
+/// [items] (already sorted) as a sortable [DataTable] when at least [tableMinWidth] wide, with the columns that fit
+/// (see [TableColumn.minWidth]), and as cards otherwise: the [titleColumn] as the card's title, the other columns as
+/// label/value rows, sorted with a "Sort by" menu. Should a table still be wider than the page (e.g. with large
+/// text), it scrolls sideways with its scrollbar always shown at the bottom of the view.
 /// Tapping a row or card opens [onTap] (the details, whose text can be copied); the list's own text isn't selectable,
 /// so a click always opens the details instead of starting a selection.
 /// It scrolls itself and is always scrollable, so it works under a [RefreshIndicator].
-class ResponsiveTable<T> extends StatelessWidget {
+class ResponsiveTable<T> extends StatefulWidget {
   final List<T> items;
   final List<TableColumn<T>> columns;
   final Widget Function(T item) actions;
@@ -52,52 +60,92 @@ class ResponsiveTable<T> extends StatelessWidget {
     required this.onSort,
     this.titleColumn = 0,
     this.tableMinWidth = WindowSize.mediumMin,
+    this.columnSpacing = 28,
   });
+
+  final double columnSpacing;
+
+  @override
+  State<ResponsiveTable<T>> createState() => _ResponsiveTableState<T>();
+}
+
+class _ResponsiveTableState<T> extends State<ResponsiveTable<T>> {
+  final _horizontal = ScrollController();
+
+  List<T> get items => widget.items;
+  List<TableColumn<T>> get columns => widget.columns;
+  int get sortColumn => widget.sortColumn;
+  bool get sortAscending => widget.sortAscending;
+  int get titleColumn => widget.titleColumn;
+
+  @override
+  void dispose() {
+    _horizontal.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => SelectionContainer.disabled(
     child: LayoutBuilder(
-      builder: (context, constraints) => constraints.maxWidth >= tableMinWidth ? _table(context, constraints.maxWidth) : _cards(context),
+      builder: (context, constraints) => constraints.maxWidth >= widget.tableMinWidth ? _table(context, constraints.maxWidth) : _cards(context),
     ),
   );
 
   Widget _table(BuildContext context, double width) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
+    final shown = [
+      for (final (i, column) in columns.indexed)
+        if (column.minWidth <= width) (i, column),
+    ];
+    final sortIndex = shown.indexWhere((c) => c.$1 == sortColumn);
+    // The sideways scrollbar belongs to the inner (depth 1) scroll view but is drawn on the outer one's box, so it
+    // stays at the bottom of the view instead of the bottom of a long table.
+    return Scrollbar(
+      controller: _horizontal,
+      thumbVisibility: true,
+      notificationPredicate: (notification) => notification.depth == 1,
       child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        // At least as wide as the page, so the table's card spans it.
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: width),
-          child: DataTable(
-            showCheckboxColumn: false,
-            columnSpacing: 28,
-            decoration: BoxDecoration(
-              color: AppTheme.panelColor(Theme.of(context).colorScheme),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 12),
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: SingleChildScrollView(
+            controller: _horizontal,
+            scrollDirection: Axis.horizontal,
+            // At least as wide as the page, so the table's card spans it.
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: width),
+              child: DataTable(
+                showCheckboxColumn: false,
+                columnSpacing: widget.columnSpacing,
+                decoration: BoxDecoration(
+                  color: AppTheme.panelColor(Theme.of(context).colorScheme),
+                  border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.antiAlias,
+                // A sort column not shown at this width marks no header (the rows stay sorted by it).
+                sortColumnIndex: sortIndex < 0 ? null : sortIndex + 1,
+                sortAscending: sortAscending,
+                // Rows grow with multi-line cells (e.g. several additional charges).
+                dataRowMaxHeight: double.infinity,
+                columns: [
+                  const DataColumn(label: Text('Actions')),
+                  for (final (i, column) in shown)
+                    DataColumn(
+                      label: Text(column.label),
+                      numeric: column.numeric,
+                      onSort: column.sortKey == null ? null : (_, ascending) => widget.onSort(i, ascending),
+                    ),
+                ],
+                rows: [
+                  for (final item in items)
+                    DataRow(
+                      onSelectChanged: (_) => widget.onTap(item),
+                      cells: [DataCell(widget.actions(item)), for (final (_, column) in shown) DataCell((column.tableCell ?? column.cell)(item))],
+                    ),
+                ],
+              ),
             ),
-            clipBehavior: Clip.antiAlias,
-            sortColumnIndex: sortColumn + 1,
-            sortAscending: sortAscending,
-            // Rows grow with multi-line cells (e.g. several additional charges).
-            dataRowMaxHeight: double.infinity,
-            columns: [
-              const DataColumn(label: Text('Actions')),
-              for (final (i, column) in columns.indexed)
-                DataColumn(
-                  label: Text(column.label),
-                  numeric: column.numeric,
-                  onSort: column.sortKey == null ? null : (_, ascending) => onSort(i, ascending),
-                ),
-            ],
-            rows: [
-              for (final item in items)
-                DataRow(
-                  onSelectChanged: (_) => onTap(item),
-                  cells: [DataCell(actions(item)), for (final column in columns) DataCell(column.cell(item))],
-                ),
-            ],
           ),
         ),
       ),
@@ -115,7 +163,7 @@ class ResponsiveTable<T> extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: InkWell(
-            onTap: () => onTap(item),
+            onTap: () => widget.onTap(item),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 14),
               child: Column(
@@ -126,7 +174,7 @@ class ResponsiveTable<T> extends StatelessWidget {
                       Expanded(
                         child: DefaultTextStyle.merge(style: Theme.of(context).textTheme.titleMedium, child: columns[titleColumn].cell(item)),
                       ),
-                      actions(item),
+                      widget.actions(item),
                     ],
                   ),
                   // Label above value, two (or more) per row, so a card stays short on phones.
@@ -141,7 +189,7 @@ class ResponsiveTable<T> extends StatelessWidget {
                           runSpacing: 10,
                           children: [
                             for (final (i, column) in columns.indexed)
-                              if (i != titleColumn)
+                              if (i != titleColumn && column.inCards)
                                 SizedBox(
                                   width: width,
                                   child: Column(
@@ -183,19 +231,19 @@ class ResponsiveTable<T> extends StatelessWidget {
               value: sortColumn,
               items: [
                 for (final (i, column) in columns.indexed)
-                  if (column.sortKey != null)
+                  if (column.sortKey != null && column.inCards)
                     DropdownMenuItem(
                       value: i,
                       child: Text(column.label, overflow: TextOverflow.ellipsis),
                     ),
               ],
-              onChanged: (column) => onSort(column!, sortAscending),
+              onChanged: (column) => widget.onSort(column!, sortAscending),
             ),
           ),
           IconButton(
             tooltip: sortAscending ? 'Ascending' : 'Descending',
             icon: Icon(sortAscending ? Icons.arrow_upward : Icons.arrow_downward),
-            onPressed: () => onSort(sortColumn, !sortAscending),
+            onPressed: () => widget.onSort(sortColumn, !sortAscending),
           ),
         ],
       ),

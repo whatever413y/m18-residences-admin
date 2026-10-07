@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/features/billing/widgets/attach_file_button.dart';
+import 'package:m18_residences_admin/features/billing/widgets/bill_file_row.dart';
+import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -46,7 +47,7 @@ class BillingFormDialog extends StatefulWidget {
   State<BillingFormDialog> createState() => _BillingFormDialogState();
 }
 
-class _BillingFormDialogState extends State<BillingFormDialog> {
+class _BillingFormDialogState extends State<BillingFormDialog> with DirtyTracking {
   final _formKey = GlobalKey<FormState>();
   final _roomChargesController = TextEditingController();
   final _electricChargesController = TextEditingController();
@@ -112,7 +113,31 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
       _selectedReadingId = reading?.id;
       _updateCharges();
     }
+    markPristine();
   }
+
+  /// The additional charges as they would be sent (empty rows left out).
+  List<List<String>> get _chargeValues => [
+    for (var i = 0; i < _additionalCharges.length; i++)
+      if (!((int.tryParse(_additionalChargeControllers[i].text.trim()) ?? 0) == 0 && _additionalDescControllers[i].text.trim().isEmpty))
+        [_additionalChargeControllers[i].text.trim(), _additionalDescControllers[i].text.trim()],
+  ];
+
+  @override
+  List<Object?> get formSnapshot => [
+    _selectedTenantId,
+    _selectedReadingId,
+    _roomChargesController.text,
+    _electricChargesController.text,
+    _chargeValues,
+    _receiptUrl,
+    _paymentUrl,
+    _receipt,
+    _payment,
+  ];
+
+  /// Never while a picked file is being converted; a new bill needs a tenant with a reading, an edit a change.
+  bool _canSave() => _preparing == 0 && (_isEditing ? isDirty : _selectedTenantId != null && _selectedReadingId != null);
 
   @override
   void dispose() {
@@ -183,6 +208,8 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
 
     final reading = _getLatestReading(_selectedRoomId, _selectedTenantId);
     _selectedReadingId = reading?.id;
+    // Said at once: Generate Bill stays disabled until the tenant has a reading.
+    if (reading == null) _formError = _noReading;
 
     final room = widget.rooms.firstWhere((r) => r.id == _selectedRoomId, orElse: () => Room(id: 0, name: '', rent: 0));
 
@@ -195,13 +222,15 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
     _electricChargesController.text = electricCharges.toString();
   }
 
+  static const _noReading = 'This tenant has no reading in this room yet: add one under Electric Readings first.';
+
   void _submit() {
-    if (_preparing > 0) return;
+    if (!_canSave()) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final tenantId = _selectedTenantId!;
     final readingId = _selectedReadingId;
     if (readingId == null) {
-      setState(() => _formError = 'This tenant has no reading in this room yet: add one under Electric Readings first.');
+      setState(() => _formError = _noReading);
       return;
     }
 
@@ -238,57 +267,71 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   Widget _buildContent() {
     return Form(
       key: _formKey,
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildRoomDropdown(),
-            const SizedBox(height: 16),
-            _buildTenantDropdown(),
-            const SizedBox(height: 16),
-            _buildRoomChargesField(),
-            const SizedBox(height: 16),
-            _buildElectricChargesField(),
-            const SizedBox(height: 16),
-            _buildAdditionalChargesList(),
-            const SizedBox(height: 16),
-            _buildAttachButtons(),
-            if (_formError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-              ),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AppModalSection(
+            label: 'Tenant',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildRoomDropdown(),
+                const SizedBox(height: 16),
+                _buildTenantDropdown(),
+                if (_formError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_formError!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          AppModalSection(
+            label: 'Charges',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildRoomChargesField(),
+                const SizedBox(height: 16),
+                _buildElectricChargesField(),
+                const SizedBox(height: 16),
+                _buildAdditionalChargesList(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          AppModalSection(label: 'Files', child: _buildFiles()),
+        ],
       ),
     );
   }
 
   void _onPreparing(bool preparing) => setState(() => _preparing += preparing ? 1 : -1);
 
-  /// The receipt (the bill is paid once it has one) and the tenant's optional payment image.
-  Widget _buildAttachButtons() {
+  /// The receipt (the bill is paid once it has one) and the tenant's optional payment image, one row each.
+  Widget _buildFiles() {
     final tenantName = widget.tenants.firstWhereOrNull((t) => t.id == _selectedTenantId)?.name;
-    return Wrap(
-      spacing: 24,
-      runSpacing: 16,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AttachFileButton(
+        BillFileField(
           kind: BillFileKind.receipt,
-          hasFile: _receiptUrl?.isNotEmpty ?? false,
+          tenantName: tenantName,
+          fileUrl: _receiptUrl,
           onChanged: (file) => setState(() => _receipt = file),
           onPreparing: _onPreparing,
-          current: buildBillFile(context, BillFileKind.receipt, tenantName, _receiptUrl),
           // Saving without a receipt URL clears it (the server archives the file).
           onRemove: () => setState(() => _receiptUrl = null),
         ),
-        AttachFileButton(
+        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
+        BillFileField(
           kind: BillFileKind.payment,
-          hasFile: _paymentUrl?.isNotEmpty ?? false,
+          tenantName: tenantName,
+          fileUrl: _paymentUrl,
           onChanged: (file) => setState(() => _payment = file),
           onPreparing: _onPreparing,
-          current: buildBillFile(context, BillFileKind.payment, tenantName, _paymentUrl),
           onRemove: () => setState(() {
             _removePayment = _paymentUrl?.isNotEmpty ?? false;
             _paymentUrl = null;
@@ -410,14 +453,17 @@ class _BillingFormDialogState extends State<BillingFormDialog> {
   List<Widget> _buildActions(BuildContext context) {
     return [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      Semantics(
-        container: true,
-        identifier: 'bill-save',
-        child: FilledButton(
-          // Disabled while a picked file is being converted.
-          onPressed: _preparing > 0 ? null : _submit,
-          child: Text(_isEditing ? 'Update Bill' : 'Generate Bill'),
-        ),
+      FormSaveButton(
+        id: 'bill-save',
+        label: _isEditing ? 'Update Bill' : 'Generate Bill',
+        canSave: _canSave,
+        onPressed: _submit,
+        disabledReason: _preparing > 0
+            ? 'Wait until the picked file is ready'
+            : _isEditing
+            ? 'Nothing changed yet'
+            : 'Choose a tenant with a reading',
+        listenable: Listenable.merge([_electricityRateController, ..._additionalChargeControllers, ..._additionalDescControllers]),
       ),
     ];
   }
