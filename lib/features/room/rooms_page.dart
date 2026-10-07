@@ -12,7 +12,6 @@ import 'package:m18_residences_admin/features/room/widgets/room_form_dialog.dart
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_add_button.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/entity_card.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -35,16 +34,15 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   Future<void> _showRoomDialog({Room? room}) async {
-    final result = await showSelectableDialog<Map<String, dynamic>?>(
-      context: context,
-      builder: (_) => RoomFormDialog(room: room),
-    );
+    final result = await showAppModal<Map<String, dynamic>?>(context, builder: (_) => RoomFormDialog(room: room));
 
     if (!mounted) return;
     if (result == null) return;
 
     final request = RoomRequest(name: result['name'] as String, rent: result['rent'] as int);
 
+    // Replaced by the bloc's result (see the listener).
+    AppToast.show(context, room != null ? 'Saving room...' : 'Adding room...', type: ToastType.loading);
     if (room != null) {
       roomBloc.add(UpdateRoom(room.id, request));
     } else {
@@ -53,13 +51,11 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   Future<void> _confirmDelete(Room room) async {
-    final messenger = ScaffoldMessenger.of(context);
-
     await showConfirmationAction(
       context: context,
-      messenger: messenger,
-      confirmTitle: 'Confirm Deletion',
-      confirmContent: 'Are you sure you want to delete this room?',
+      title: 'Delete ${room.name}?',
+      message: "This can't be undone. A room that still has tenants or readings can't be deleted.",
+      confirmLabel: 'Delete room',
       onConfirmed: () async {
         await _deleteRoom(room.id);
       },
@@ -81,16 +77,16 @@ class _RoomsPageState extends State<RoomsPage> {
       body: BlocListener<RoomBloc, RoomState>(
         listener: (context, state) {
           if (state is RoomActionFailed) {
-            CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+            AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is RoomError) {
             // A failed load may mean the session expired; the auth check then shows the login error.
             authBloc.add(CheckAuthStatus());
           } else if (state is AddSuccess) {
-            CustomSnackbar.show(context, 'Room created', type: SnackBarType.success);
+            AppToast.show(context, 'Room created', type: ToastType.success);
           } else if (state is UpdateSuccess) {
-            CustomSnackbar.show(context, 'Room updated', type: SnackBarType.success);
+            AppToast.show(context, 'Room updated', type: ToastType.success);
           } else if (state is DeleteSuccess) {
-            CustomSnackbar.show(context, 'Room deleted', type: SnackBarType.success);
+            AppToast.show(context, 'Room deleted', type: ToastType.success);
           }
         },
         child: BlocBuilder<RoomBloc, RoomState>(

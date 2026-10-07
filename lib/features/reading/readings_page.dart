@@ -13,7 +13,6 @@ import 'package:m18_residences_admin/features/reading/widgets/reading_form_dialo
 import 'package:m18_residences_admin/utils/admin_app_bar.dart';
 import 'package:m18_residences_admin/utils/confirmation_action.dart';
 import 'package:m18_residences_admin/utils/custom_add_button.dart';
-import 'package:m18_residences_admin/utils/custom_snackbar.dart';
 import 'package:m18_residences_admin/utils/responsive_table.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
@@ -96,8 +95,8 @@ class ReadingsPageState extends State<ReadingsPage> {
   }
 
   Future<void> _showReadingDialog(ReadingLoaded state, {Reading? reading}) async {
-    final result = await showSelectableDialog<ReadingRequest>(
-      context: context,
+    final result = await showAppModal<ReadingRequest>(
+      context,
       builder: (context) => ReadingFormDialog(
         showActiveOnly: _showActiveOnly,
         selectedRoomId: _filterRoomId,
@@ -111,13 +110,13 @@ class ReadingsPageState extends State<ReadingsPage> {
     if (!mounted || result == null) return;
 
     // Replaced by the bloc's result (see the listener).
-    CustomSnackbar.show(context, reading != null ? 'Updating reading...' : 'Adding reading...', type: SnackBarType.loading);
+    AppToast.show(context, reading != null ? 'Updating reading...' : 'Adding reading...', type: ToastType.loading);
     readingBloc.add(reading != null ? UpdateReading(reading.id, result) : AddReading(result));
   }
 
   void _showReadingDetailsDialog(Reading reading, _ReadingsView view) {
-    showSelectableDialog(
-      context: context,
+    showAppModal(
+      context,
       builder: (context) => ReadingDetailsDialog(
         reading: reading,
         getTenantName: (id) => view.tenants[id]?.name ?? 'Unknown Tenant',
@@ -141,17 +140,17 @@ class ReadingsPageState extends State<ReadingsPage> {
       body: BlocListener<ReadingBloc, ReadingState>(
         listener: (context, state) {
           if (state is ReadingActionFailed) {
-            CustomSnackbar.show(context, state.message, type: SnackBarType.error, duration: const Duration(seconds: 6));
+            AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is ReadingError) {
-            CustomSnackbar.hide(context);
+            AppToast.hide();
             // A failed load may mean the session expired; the auth check then shows the login error.
             context.read<AuthBloc>().add(CheckAuthStatus());
           } else if (state is AddSuccess) {
-            CustomSnackbar.show(context, 'Reading created', type: SnackBarType.success);
+            AppToast.show(context, 'Reading created', type: ToastType.success);
           } else if (state is UpdateSuccess) {
-            CustomSnackbar.show(context, 'Reading updated', type: SnackBarType.success);
+            AppToast.show(context, 'Reading updated', type: ToastType.success);
           } else if (state is DeleteSuccess) {
-            CustomSnackbar.show(context, 'Reading deleted', type: SnackBarType.success);
+            AppToast.show(context, 'Reading deleted', type: ToastType.success);
           }
         },
         child: BlocBuilder<ReadingBloc, ReadingState>(
@@ -255,9 +254,10 @@ class ReadingsPageState extends State<ReadingsPage> {
                               icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                               onPressed: () => showConfirmationAction(
                                 context: context,
-                                messenger: ScaffoldMessenger.of(context),
-                                confirmTitle: 'Confirm Deletion',
-                                confirmContent: 'Are you sure you want to delete this reading?',
+                                title:
+                                    "Delete ${view.tenants[reading.tenantId]?.name ?? 'this tenant'}'s ${DateFormat.yMMMM().format(reading.createdAt)} reading?",
+                                message: "This can't be undone. A reading that already has a bill can't be deleted.",
+                                confirmLabel: 'Delete reading',
                                 onConfirmed: () => _deleteReading(reading.id),
                               ),
                             ),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
+import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class TenantFormDialog extends StatefulWidget {
@@ -14,7 +14,7 @@ class TenantFormDialog extends StatefulWidget {
   State<TenantFormDialog> createState() => _TenantFormDialogState();
 }
 
-class _TenantFormDialogState extends State<TenantFormDialog> {
+class _TenantFormDialogState extends State<TenantFormDialog> with DirtyTracking {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   String? _selectedRoomId;
@@ -32,7 +32,14 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
     // New tenants default to joining today; "Pick Date" changes it.
     _selectedJoinDate = widget.tenant?.joinDate ?? DateUtils.dateOnly(DateTime.now());
     _isActive = widget.tenant?.isActive ?? true;
+    markPristine();
   }
+
+  @override
+  List<Object?> get formSnapshot => [_nameController.text.trim(), _selectedRoomId, _selectedJoinDate, _isActive];
+
+  /// A new tenant needs a name and a room; an edit, a change.
+  bool _canSave() => widget.tenant == null ? _nameController.text.trim().isNotEmpty && _selectedRoomId != null : isDirty;
 
   @override
   void dispose() {
@@ -41,6 +48,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
   }
 
   void _submit() {
+    if (!_canSave()) return;
     if (_formKey.currentState?.validate() != true) return;
     final name = _nameController.text.trim();
     final roomId = int.parse(_selectedRoomId!);
@@ -53,12 +61,12 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.tenant != null;
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      scrollable: true,
-      title: _buildTitle(isEditing),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.person_outline),
+      title: isEditing ? 'Edit Tenant' : 'Add New Tenant',
+      subtitle: isEditing ? widget.tenant!.name : 'The name is also their account ID',
       actions: _buildActions(context, isEditing),
+      child: _buildContent(),
     );
   }
 
@@ -88,12 +96,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
           _isActive = val;
         });
       },
-      activeThumbColor: Theme.of(context).primaryColor,
     );
-  }
-
-  Widget _buildTitle(bool isEditing) {
-    return Text(isEditing ? 'Edit Tenant' : 'Add New Tenant');
   }
 
   Widget _buildNameField() {
@@ -103,7 +106,7 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
       semanticsId: 'tenant-name',
       validator: (value) => (value == null || value.trim().isEmpty) ? 'Enter tenant' : null,
       onFieldSubmitted: (_) => _submit(),
-      prefixIcon: Icon(Icons.person, color: Theme.of(context).primaryColor),
+      prefixIcon: const Icon(Icons.person_outline),
     );
   }
 
@@ -166,17 +169,13 @@ class _TenantFormDialogState extends State<TenantFormDialog> {
   List<Widget> _buildActions(BuildContext context, bool isEditing) {
     return [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      Semantics(
-        container: true,
-        identifier: 'tenant-save',
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: Text(isEditing ? 'Save' : 'Add'),
-        ),
+      FormSaveButton(
+        id: 'tenant-save',
+        label: isEditing ? 'Save' : 'Add',
+        canSave: _canSave,
+        onPressed: _submit,
+        disabledReason: isEditing ? 'Nothing changed yet' : 'Enter a name and choose a room',
+        listenable: _nameController,
       ),
     ];
   }

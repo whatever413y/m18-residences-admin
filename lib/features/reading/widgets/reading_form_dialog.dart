@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:m18_residences_admin/utils/form_dialog.dart';
+import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
@@ -27,7 +27,7 @@ class ReadingFormDialog extends StatefulWidget {
   State<ReadingFormDialog> createState() => _ReadingFormDialogState();
 }
 
-class _ReadingFormDialogState extends State<ReadingFormDialog> {
+class _ReadingFormDialogState extends State<ReadingFormDialog> with DirtyTracking {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController prevController = TextEditingController();
   final TextEditingController currController = TextEditingController();
@@ -49,7 +49,14 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
       prevController.text = _getLatestReading(_selectedRoomId ?? 0, _selectedTenantId ?? 0)?.currReading.toString() ?? '0';
       currController.clear();
     }
+    markPristine();
   }
+
+  @override
+  List<Object?> get formSnapshot => [_selectedRoomId, _selectedTenantId, prevController.text.trim(), currController.text.trim()];
+
+  /// A new reading needs a room, a tenant and the current reading; an edit, a change.
+  bool _canSave() => widget.reading == null ? _selectedRoomId != null && _selectedTenantId != null && currController.text.trim().isNotEmpty : isDirty;
 
   @override
   void dispose() {
@@ -74,12 +81,12 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      insetPadding: formDialogInset(context),
-      scrollable: true,
-      title: Text(widget.reading == null ? 'Add New Reading' : 'Edit Reading'),
-      content: SizedBox(width: formDialogWidth(context), child: _buildContent()),
+    return AppModal(
+      leading: AppModal.icon(context, Icons.bolt_outlined),
+      title: widget.reading == null ? 'Add New Reading' : 'Edit Reading',
+      subtitle: 'Meter readings in kWh',
       actions: _buildActions(context, widget.reading != null),
+      child: _buildContent(),
     );
   }
 
@@ -104,17 +111,13 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
   List<Widget> _buildActions(BuildContext context, bool isEditing) {
     return [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      Semantics(
-        container: true,
-        identifier: 'reading-save',
-        child: ElevatedButton(
-          onPressed: _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          child: Text(widget.reading == null ? 'Add' : 'Save'),
-        ),
+      FormSaveButton(
+        id: 'reading-save',
+        label: isEditing ? 'Save' : 'Add',
+        canSave: _canSave,
+        onPressed: _submit,
+        disabledReason: isEditing ? 'Nothing changed yet' : 'Choose the tenant and enter the current reading',
+        listenable: Listenable.merge([prevController, currController]),
       ),
     ];
   }
@@ -202,6 +205,7 @@ class _ReadingFormDialogState extends State<ReadingFormDialog> {
   }
 
   void _submit() {
+    if (!_canSave()) return;
     if (_formKey.currentState?.validate() != true) return;
     // The validators ensure a room, a tenant and both readings.
     Navigator.of(context).pop(

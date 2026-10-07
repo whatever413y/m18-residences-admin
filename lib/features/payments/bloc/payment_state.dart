@@ -11,15 +11,15 @@ class PaymentInitial extends PaymentState {}
 class PaymentLoading extends PaymentState {}
 
 class PaymentLoaded extends PaymentState {
-  final List<PaymentImage> images;
+  final List<PaymentMethod> methods;
 
-  PaymentLoaded(this.images);
+  PaymentLoaded(this.methods);
 
   @override
-  List<Object?> get props => [images];
+  List<Object?> get props => [methods];
 }
 
-/// Loading the payment images failed; the page shows the error instead of them.
+/// Loading the payment methods failed; the page shows the error instead of them.
 class PaymentError extends PaymentState {
   final String message;
 
@@ -29,26 +29,25 @@ class PaymentError extends PaymentState {
   List<Object?> get props => [message];
 }
 
-class PaymentReplaced extends PaymentState {
-  final String name;
-
-  PaymentReplaced(this.name);
-
-  @override
-  List<Object?> get props => [name];
-}
-
-/// Replacing a payment image failed; the page keeps showing the images and reports [message].
-class PaymentActionFailed extends PaymentState {
+/// Every action result is a new state, so the same result twice in a row is reported twice.
+abstract class _PaymentActionResult extends PaymentState {
   static int _count = 0;
 
   final String message;
-
-  /// Makes every failure a new state, so the same failure twice in a row is reported twice.
   final int _id = _count++;
 
-  PaymentActionFailed(this.message);
+  _PaymentActionResult(this.message);
 
   @override
   List<Object?> get props => [message, _id];
+}
+
+/// An action succeeded; the page reports [message] (e.g. "GCash QR code replaced").
+class PaymentActionSucceeded extends _PaymentActionResult {
+  PaymentActionSucceeded(super.message);
+}
+
+/// An action failed; the page keeps showing the methods and reports [message].
+class PaymentActionFailed extends _PaymentActionResult {
+  PaymentActionFailed(super.message);
 }
