@@ -119,6 +119,14 @@ class BillingsPageState extends State<BillingsPage> {
     String usage(Bill bill) => '${bill.consumption} kWh · ${DateFormat.MMM().format(usageMonth(bill.createdAt))}';
 
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
+    Widget electric(Bill bill, CrossAxisAlignment align) => Column(
+      crossAxisAlignment: align,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(_currency.format(bill.electricCharges)),
+        Text(usage(bill), style: muted),
+      ],
+    );
     Widget file(Bill bill, BillFileKind kind, String? url) => (url?.isNotEmpty ?? false)
         ? buildBillFile(context, kind, tenants[bill.tenantId]?.name, url, iconOnly: true)
         // Keeps the other file's button in its place.
@@ -148,16 +156,9 @@ class BillingsPageState extends State<BillingsPage> {
       ),
       TableColumn(
         'Electric Charges',
-        (bill) => Text('${_currency.format(bill.electricCharges)} (${usage(bill)})'),
-        // The consumption under the amount: the table has no Consumption column.
-        tableCell: (bill) => Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_currency.format(bill.electricCharges)),
-            Text(usage(bill), style: muted),
-          ],
-        ),
+        // The consumption under the amount (no Consumption column); right-aligned in the table.
+        (bill) => electric(bill, CrossAxisAlignment.start),
+        tableCell: (bill) => electric(bill, CrossAxisAlignment.end),
         sortKey: (bill) => bill.electricCharges,
         numeric: true,
         minWidth: _withCharges,
