@@ -50,7 +50,8 @@ class _TenantFormDialogState extends State<TenantFormDialog> with DirtyTracking 
   void _submit() {
     if (!_canSave()) return;
     if (_formKey.currentState?.validate() != true) return;
-    final name = _nameController.text.trim();
+    // The name is the tenant's account ID, which the tenant app sends in capitals.
+    final name = _nameController.text.trim().toUpperCase();
     final roomId = int.parse(_selectedRoomId!);
     final joinDate = _selectedJoinDate!;
     final isActive = _isActive;
@@ -99,12 +100,23 @@ class _TenantFormDialogState extends State<TenantFormDialog> with DirtyTracking 
     );
   }
 
+  /// The server's rules for a tenant name (it becomes part of the tenant's file keys).
+  static String? _validateName(String? value) {
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) return 'Enter tenant';
+    if (name.length > 64) return 'At most 64 characters';
+    if (name.contains('/') || name.contains(r'\') || name.contains('..') || name.runes.any((c) => c < 32 || c == 127)) {
+      return r"No '/', '\', '..' or control characters";
+    }
+    return null;
+  }
+
   Widget _buildNameField() {
     return CustomTextFormField(
       controller: _nameController,
       labelText: 'Tenant',
       semanticsId: 'tenant-name',
-      validator: (value) => (value == null || value.trim().isEmpty) ? 'Enter tenant' : null,
+      validator: _validateName,
       onFieldSubmitted: (_) => _submit(),
       prefixIcon: const Icon(Icons.person_outline),
     );

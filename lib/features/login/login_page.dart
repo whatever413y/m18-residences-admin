@@ -15,6 +15,10 @@ class LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _turnstile = TurnstileController();
+
+  /// Login was asked for before the verification finished: log in as soon as it does.
+  bool _submitWhenVerified = false;
 
   String? _usernameError;
   String? _passwordError;
@@ -26,6 +30,29 @@ class LoginPageState extends State<LoginPage> {
     });
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _turnstile.addListener(_onVerified);
+  }
+
+  @override
+  void dispose() {
+    _turnstile
+      ..removeListener(_onVerified)
+      ..dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _onVerified() {
+    if (_submitWhenVerified && _turnstile.token != null) {
+      setState(() => _submitWhenVerified = false);
+      _submitLogin();
+    }
+  }
+
   void _submitLogin() {
     setState(() {
       _usernameError = null;
@@ -33,9 +60,16 @@ class LoginPageState extends State<LoginPage> {
     });
 
     if (_formKey.currentState?.validate() ?? false) {
+      final token = _turnstile.token;
+      if (token == null) {
+        setState(() => _submitWhenVerified = true);
+        return;
+      }
       final username = _usernameController.text.trim();
       final password = _passwordController.text.trim();
-      context.read<AuthBloc>().add(LoginWithAccountId(username: username, password: password));
+      context.read<AuthBloc>().add(LoginWithAccountId(username: username, password: password, turnstileToken: token));
+      // Tokens are single use: the next attempt needs a new one.
+      _turnstile.reset();
     }
   }
 
@@ -111,7 +145,9 @@ class LoginPageState extends State<LoginPage> {
                   _buildUsernameField(),
                   const SizedBox(height: 16),
                   _buildPasswordField(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  TurnstileField(controller: _turnstile, action: 'admin-login'),
+                  const SizedBox(height: 16),
                   _buildLoginButton(),
                 ],
               ),
@@ -166,7 +202,8 @@ class LoginPageState extends State<LoginPage> {
     return Semantics(
       container: true,
       identifier: 'admin-login-submit',
-      child: FilledButton(onPressed: _submitLogin, child: const Text('Login')),
+      // Pressed before the verification above has finished, it logs in once it has.
+      child: FilledButton(onPressed: _submitLogin, child: Text(_submitWhenVerified ? 'Verifying…' : 'Login')),
     );
   }
 }

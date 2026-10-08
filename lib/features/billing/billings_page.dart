@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:m18_residences_admin/features/billing/bloc/bill_scope.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_bloc.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_event.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_state.dart';
@@ -78,7 +79,7 @@ class BillingsPageState extends State<BillingsPage> {
   void _applyShellFilter() {
     final filter = _shellFilter.value;
     if (filter == null) return;
-    setState(() {
+    _setFilters(() {
       _filterTenantId = filter.tenantId;
       _filterRoomId = filter.roomId;
       _filterYear = null;
@@ -86,6 +87,15 @@ class BillingsPageState extends State<BillingsPage> {
       _showActiveOnly = false;
     });
     _shellFilter.value = null;
+  }
+
+  /// The bills the current filters can show (only recent and open bills come with the first load).
+  BillView get _billView => BillView(year: _filterYear, tenantId: _filterTenantId, roomId: _filterRoomId);
+
+  /// Changes the room, tenant or year filter, then loads the bills it needs (if they aren't loaded yet).
+  void _setFilters(VoidCallback change) {
+    setState(change);
+    billingBloc.add(EnsureBills(_billView));
   }
 
   /// The room a bill is for: its reading's, else the tenant's current room.
@@ -128,7 +138,7 @@ class BillingsPageState extends State<BillingsPage> {
       ],
     );
     Widget file(Bill bill, BillFileKind kind, String? url) => (url?.isNotEmpty ?? false)
-        ? buildBillFile(context, kind, tenants[bill.tenantId]?.name, url, iconOnly: true)
+        ? buildBillFile(context, kind, bill.id, tenants[bill.tenantId]?.name, url, iconOnly: true)
         // Keeps the other file's button in its place.
         : const SizedBox(width: 48);
 
@@ -188,13 +198,15 @@ class BillingsPageState extends State<BillingsPage> {
       // Cards only: the table has the Files column and the room under the tenant.
       TableColumn(
         'Payment',
-        (bill) => bill.hasPayment ? buildBillFile(context, BillFileKind.payment, tenants[bill.tenantId]?.name, bill.paymentUrl) : const Text('-'),
+        (bill) =>
+            bill.hasPayment ? buildBillFile(context, BillFileKind.payment, bill.id, tenants[bill.tenantId]?.name, bill.paymentUrl) : const Text('-'),
         sortKey: (bill) => bill.hasPayment ? 1 : 0,
         minWidth: double.infinity,
       ),
       TableColumn(
         'Receipt',
-        (bill) => bill.hasReceipt ? buildBillFile(context, BillFileKind.receipt, tenants[bill.tenantId]?.name, bill.receiptUrl) : const Text('-'),
+        (bill) =>
+            bill.hasReceipt ? buildBillFile(context, BillFileKind.receipt, bill.id, tenants[bill.tenantId]?.name, bill.receiptUrl) : const Text('-'),
         sortKey: (bill) => bill.hasReceipt ? 1 : 0,
         minWidth: double.infinity,
       ),
@@ -265,7 +277,10 @@ class BillingsPageState extends State<BillingsPage> {
         onRefresh: () => billingBloc.add(LoadBills()),
         actions: [buildActiveToggleFilter(showActiveOnly: _showActiveOnly, onChanged: (value) => setState(() => _showActiveOnly = value))],
       ),
-      body: BlocBuilder<BillingBloc, BillingState>(
+      body: BlocConsumer<BillingBloc, BillingState>(
+        // A reload starts over from the recent bills: load again what the filters need.
+        listenWhen: (previous, state) => state is BillingLoaded && (previous is! BillingLoaded || previous.coverage != state.coverage),
+        listener: (context, state) => billingBloc.add(EnsureBills(_billView)),
         buildWhen: (_, state) => _shows(state),
         builder: (context, state) {
           if (state is BillingError) {
@@ -304,7 +319,7 @@ class BillingsPageState extends State<BillingsPage> {
                 tenants: state.tenants,
                 selectedRoomId: _filterRoomId,
                 selectedTenantId: _filterTenantId,
-                onFilterChanged: (roomId, tenantId) => setState(() {
+                onFilterChanged: (roomId, tenantId) => _setFilters(() {
                   _filterRoomId = roomId;
                   _filterTenantId = tenantId;
                 }),
@@ -315,19 +330,21 @@ class BillingsPageState extends State<BillingsPage> {
                 selectedTenantId: _filterTenantId,
                 showActiveOnly: _showActiveOnly,
                 allLabel: 'All Tenants',
-                onFilterChanged: (tenantId, roomId) => setState(() {
+                onFilterChanged: (tenantId, roomId) => _setFilters(() {
                   _filterTenantId = tenantId;
                   _filterRoomId = roomId;
                 }),
               ),
               year: buildYearFilter(
-                dates: state.bills.map((bill) => bill.createdAt),
+                // Every year with bills, not only the loaded ones.
+                dates: state.years.map((year) => DateTime(year)),
                 selectedYear: _filterYear,
-                onYearChanged: (year) => setState(() => _filterYear = year),
+                onYearChanged: (year) => _setFilters(() => _filterYear = year),
               ),
               month: buildMonthFilter(selectedMonth: _filterMonth, onMonthChanged: (month) => setState(() => _filterMonth = month)),
             ),
-            const SizedBox(height: 12),
+            // The bills of an older year, a tenant or a room are on their way.
+            SizedBox(height: 12, child: state.loadingMore ? const Center(child: LinearProgressIndicator(minHeight: 3)) : null),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {

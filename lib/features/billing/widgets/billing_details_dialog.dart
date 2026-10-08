@@ -98,7 +98,7 @@ class BillingDetailsDialog extends StatelessWidget {
           Semantics(
             container: true,
             identifier: 'bill-view-${kind.subject}',
-            child: buildBillFile(context, kind, tenantName, fileUrl, label: 'View'),
+            child: buildBillFile(context, kind, bill.id, tenantName, fileUrl, label: 'View'),
           ),
       ],
     );

@@ -43,12 +43,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLoginWithAccountId(LoginWithAccountId event, Emitter<AuthState> emit) async {
     emit(AuthLoading());
     try {
-      final session = await authApi.adminLogin(event.username, event.password);
+      final session = await authApi.adminLogin(event.username, event.password, turnstileToken: event.turnstileToken);
       final admin = Admin(username: session.username);
       _cachedAdmin = admin;
       emit(Authenticated(token: session.token, admin: admin));
     } on InvalidCredentialsException {
       emit(AuthError('Invalid credentials'));
+    } on TooManyAttemptsException {
+      emit(AuthError('Too many attempts. Please wait a minute and try again.'));
+    } on VerificationFailedException catch (e) {
+      emit(AuthError(e.unavailable ? "Couldn't verify right now. Please try again." : 'Verification failed. Please try again.'));
     } on TimeoutException {
       emit(AuthError('Connection timed out. Please try again.'));
     } on SocketException {

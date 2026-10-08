@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:m18_residences_admin/features/billing/bloc/bill_scope.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 abstract class BillingState extends Equatable {
@@ -17,15 +18,33 @@ class UpdateSuccess extends BillingState {}
 class DeleteSuccess extends BillingState {}
 
 class BillingLoaded extends BillingState {
+  /// Newest first: the bills [coverage] says are loaded (not every bill).
   final List<Bill> bills;
   final List<Room> rooms;
   final List<Tenant> tenants;
   final List<Reading> readings;
 
-  BillingLoaded(this.bills, this.rooms, this.tenants, this.readings);
+  /// The years with bills, newest first (for the year filter).
+  final List<int> years;
+  final BillCoverage coverage;
+
+  /// More bills for the Billing page's filters are on their way.
+  final bool loadingMore;
+
+  BillingLoaded(this.bills, this.rooms, this.tenants, this.readings, {required this.years, required this.coverage, this.loadingMore = false});
+
+  BillingLoaded copyWith({List<Bill>? bills, BillCoverage? coverage, bool? loadingMore}) => BillingLoaded(
+    bills ?? this.bills,
+    rooms,
+    tenants,
+    readings,
+    years: years,
+    coverage: coverage ?? this.coverage,
+    loadingMore: loadingMore ?? this.loadingMore,
+  );
 
   @override
-  List<Object?> get props => [bills, rooms, tenants, readings];
+  List<Object?> get props => [bills, rooms, tenants, readings, years, coverage, loadingMore];
 }
 
 /// Loading the billing data failed; the page shows the error instead of the bills.

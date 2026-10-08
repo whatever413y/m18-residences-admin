@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:m18_residences_admin/features/billing/bloc/bill_scope.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 import 'billing_event.dart';
@@ -12,6 +13,7 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
 
   BillingBloc({required this.readingApi, required this.roomApi, required this.tenantApi, required this.billApi}) : super(BillingInitial()) {
     on<LoadBills>(_onLoadBills);
+    on<EnsureBills>(_onEnsureBills);
     on<AddBill>(_onAddBill);
     on<UpdateBill>(_onUpdateBill);
     on<DeleteBill>(_onDeleteBill);
@@ -19,14 +21,52 @@ class BillingBloc extends Bloc<BillingEvent, BillingState> {
 
   static String _reason(Object e) => e is ApiException ? e.message : '$e';
 
+  /// The last loaded data (action results replace the state for a moment).
+  BillingLoaded? _loaded;
+
+  void _emitLoaded(Emitter<BillingState> emit, BillingLoaded state) => emit(_loaded = state);
+
   Future<void> _onLoadBills(LoadBills event, Emitter<BillingState> emit) async {
     emit(BillingLoading());
     try {
+      final since = BillCoverage.sinceFor(DateTime.now());
       // Independent requests, sent together; the first failure is reported.
-      final data = await Future.wait<Object>([billApi.list(), roomApi.list(), tenantApi.list(), readingApi.list()]);
-      emit(BillingLoaded(data[0] as List<Bill>, data[1] as List<Room>, data[2] as List<Tenant>, data[3] as List<Reading>));
+      final data = await Future.wait<Object>([billApi.list(since: since), billApi.years(), roomApi.list(), tenantApi.list(), readingApi.list()]);
+      _emitLoaded(
+        emit,
+        BillingLoaded(
+          data[0] as List<Bill>,
+          data[2] as List<Room>,
+          data[3] as List<Tenant>,
+          data[4] as List<Reading>,
+          years: data[1] as List<int>,
+          coverage: BillCoverage(since: since),
+        ),
+      );
     } catch (e) {
       emit(BillingError('Failed to load billing data: ${_reason(e)}'));
+    }
+  }
+
+  Future<void> _onEnsureBills(EnsureBills event, Emitter<BillingState> emit) async {
+    final loaded = _loaded;
+    if (loaded == null || loaded.loadingMore || loaded.coverage.covers(event.view)) return;
+    _emitLoaded(emit, loaded.copyWith(loadingMore: true));
+    final query = BillQuery.of(event.view);
+    try {
+      final more = await billApi.list(year: query.year, tenantId: query.tenantId, roomId: query.roomId);
+      // A reload may have replaced the data meanwhile; merge into the newest.
+      final current = _loaded ?? loaded;
+      final byId = {for (final bill in current.bills) bill.id: bill, for (final bill in more) bill.id: bill};
+      final bills = byId.values.toList()
+        ..sort((a, b) {
+          final byDate = b.createdAt.compareTo(a.createdAt);
+          return byDate != 0 ? byDate : b.id.compareTo(a.id);
+        });
+      _emitLoaded(emit, current.copyWith(bills: bills, coverage: current.coverage.including(event.view), loadingMore: false));
+    } catch (e) {
+      _emitLoaded(emit, (_loaded ?? loaded).copyWith(loadingMore: false));
+      emit(BillingActionFailed('Failed to load more bills: ${_reason(e)}'));
     }
   }
 
