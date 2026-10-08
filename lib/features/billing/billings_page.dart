@@ -39,7 +39,7 @@ class BillingsPageState extends State<BillingsPage> {
   static final _currency = NumberFormat.currency(locale: 'en_PH', symbol: '₱', decimalDigits: 0);
 
   /// Index of the Date column in [_columns], the default sort (newest first).
-  static const _dateColumn = 1;
+  static const _dateColumn = 7;
 
   /// Table widths at which more columns join (below [_tableMin]: cards). Measured with the default text size: the
   /// first tier is about 840 px wide, the second about 1,080, the full table about 1,370.
@@ -115,6 +115,8 @@ class BillingsPageState extends State<BillingsPage> {
     String tenantName(Bill bill) => tenants[bill.tenantId]?.name ?? '-';
     String roomName(Bill bill) => rooms[_roomIdOf(bill, tenants)]?.name ?? '-';
     int additionalTotal(Bill bill) => bill.additionalCharges.fold(0, (sum, charge) => sum + charge.amount);
+    // "120 kWh · Sep": the consumption and the month it was used (the month before the bill's).
+    String usage(Bill bill) => '${bill.consumption} kWh · ${DateFormat.MMM().format(usageMonth(bill.createdAt))}';
 
     final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
     Widget file(Bill bill, BillFileKind kind, String? url) => (url?.isNotEmpty ?? false)
@@ -137,7 +139,30 @@ class BillingsPageState extends State<BillingsPage> {
         ),
         sortKey: (bill) => tenantName(bill).toLowerCase(),
       ),
-      TableColumn('Date', (bill) => Text(_dateFormat.format(bill.createdAt)), sortKey: (bill) => bill.createdAt),
+      TableColumn(
+        'Room Charges',
+        (bill) => Text(_currency.format(bill.roomCharges)),
+        sortKey: (bill) => bill.roomCharges,
+        numeric: true,
+        minWidth: _withCharges,
+      ),
+      TableColumn(
+        'Electric Charges',
+        (bill) => Text('${_currency.format(bill.electricCharges)} (${usage(bill)})'),
+        // The consumption under the amount: the table has no Consumption column.
+        tableCell: (bill) => Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_currency.format(bill.electricCharges)),
+            Text(usage(bill), style: muted),
+          ],
+        ),
+        sortKey: (bill) => bill.electricCharges,
+        numeric: true,
+        minWidth: _withCharges,
+      ),
+      TableColumn('Additional Charges', _additionalCharges, sortKey: additionalTotal, minWidth: _full),
       TableColumn(
         'Total',
         (bill) => Semantics(container: true, identifier: 'bill-total-${tenantName(bill)}', child: Text(_currency.format(bill.totalAmount))),
@@ -157,22 +182,8 @@ class BillingsPageState extends State<BillingsPage> {
         ),
         inCards: false,
       ),
-      TableColumn(
-        'Electric Charges',
-        (bill) => Text(_currency.format(bill.electricCharges)),
-        sortKey: (bill) => bill.electricCharges,
-        numeric: true,
-        minWidth: _withCharges,
-      ),
-      TableColumn(
-        'Room Charges',
-        (bill) => Text(_currency.format(bill.roomCharges)),
-        sortKey: (bill) => bill.roomCharges,
-        numeric: true,
-        minWidth: _withCharges,
-      ),
-      TableColumn('Consumption (kWh)', (bill) => Text('${bill.consumption}'), sortKey: (bill) => bill.consumption, numeric: true, minWidth: _full),
-      TableColumn('Additional Charges', _additionalCharges, sortKey: additionalTotal, minWidth: _full),
+      // Last: the month filter already narrows the table to a month.
+      TableColumn('Date', (bill) => Text(_dateFormat.format(bill.createdAt)), sortKey: (bill) => bill.createdAt),
       // Cards only: the table has the Files column and the room under the tenant.
       TableColumn(
         'Payment',

@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:m18_residences_admin/features/billing/widgets/bill_file_row.dart';
 import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
@@ -521,7 +522,13 @@ class _BillingFormDialogState extends State<BillingFormDialog> with DirtyTrackin
       children: [
         Expanded(
           flex: 3,
-          child: CustomTextFormField(controller: _electricChargesController, labelText: 'Electric Charges', enabled: false, prefixIcon: _peso()),
+          child: CustomTextFormField(
+            controller: _electricChargesController,
+            // A new bill is posted now, for last month's electricity.
+            labelText: 'Electric Charges (${DateFormat.MMM().format(usageMonth(widget.bill?.createdAt ?? DateTime.now()))})',
+            enabled: false,
+            prefixIcon: _peso(),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(

@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
+/// The month electricity billed on [posted] was used: bills are posted early in a month for the month before's usage
+/// (their room charge is for the posting month).
+DateTime usageMonth(DateTime posted) => DateTime(posted.year, posted.month - 1);
+
 /// "Active only" filter chip: hides inactive tenants (and their readings and bills) while selected.
 Widget buildActiveToggleFilter({required bool showActiveOnly, required ValueChanged<bool> onChanged}) {
   return FilterChip(label: const Text('Active only'), selected: showActiveOnly, onSelected: onChanged);
