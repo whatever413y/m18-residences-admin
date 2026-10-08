@@ -92,6 +92,9 @@ ButtonStyle _rowButtonStyle() =>
 /// `bill-remove-<receipt|payment>`, `bill-view-<receipt|payment>`.
 class BillFileField extends StatefulWidget {
   final BillFileKind kind;
+
+  /// The bill being edited (`null` for a new one, which has no files yet).
+  final int? billId;
   final String? tenantName;
 
   /// The bill's file (a file name), `null` when it has none or it was removed.
@@ -107,6 +110,7 @@ class BillFileField extends StatefulWidget {
   const BillFileField({
     super.key,
     required this.kind,
+    required this.billId,
     required this.tenantName,
     required this.fileUrl,
     required this.onChanged,
@@ -202,7 +206,8 @@ class _BillFileFieldState extends State<BillFileField> {
   Widget build(BuildContext context) {
     final subject = widget.kind.subject;
     final picked = _picked;
-    final showView = _hasFile && picked == null && !_removed && !_preparing;
+    final billId = widget.billId;
+    final showView = billId != null && _hasFile && picked == null && !_removed && !_preparing;
     final canRemove = !_preparing && (_hasFile || picked != null);
     return BillFileRow(
       kind: widget.kind,
@@ -213,7 +218,7 @@ class _BillFileFieldState extends State<BillFileField> {
           Semantics(
             container: true,
             identifier: 'bill-view-$subject',
-            child: buildBillFile(context, widget.kind, widget.tenantName, widget.fileUrl, label: 'View'),
+            child: buildBillFile(context, widget.kind, billId, widget.tenantName, widget.fileUrl, label: 'View'),
           ),
         Semantics(
           container: true,

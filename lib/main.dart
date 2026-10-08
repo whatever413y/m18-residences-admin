@@ -11,6 +11,8 @@ import 'features/login/login_page.dart';
 Future<void> main() async {
   // Fails right away with a clear StateError when the app was built without API_URL (see .env.example).
   ApiConfig.baseUrl;
+  // Likewise without TURNSTILE_SITE_KEY (the login page's captcha).
+  TurnstileConfig.siteKey;
   WidgetsFlutterBinding.ensureInitialized();
   final themeMode = await ThemeModeController.load();
   runApp(MyApp(themeMode: themeMode));

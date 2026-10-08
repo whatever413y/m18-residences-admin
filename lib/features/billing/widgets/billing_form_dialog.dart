@@ -319,6 +319,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> with DirtyTrackin
       children: [
         BillFileField(
           kind: BillFileKind.receipt,
+          billId: widget.bill?.id,
           tenantName: tenantName,
           fileUrl: _receiptUrl,
           onChanged: (file) => setState(() => _receipt = file),
@@ -329,6 +330,7 @@ class _BillingFormDialogState extends State<BillingFormDialog> with DirtyTrackin
         const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider()),
         BillFileField(
           kind: BillFileKind.payment,
+          billId: widget.bill?.id,
           tenantName: tenantName,
           fileUrl: _paymentUrl,
           onChanged: (file) => setState(() => _payment = file),

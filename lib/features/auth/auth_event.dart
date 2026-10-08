@@ -11,7 +11,10 @@ class LoginWithAccountId extends AuthEvent {
   final String username;
   final String password;
 
-  LoginWithAccountId({required this.username, required this.password});
+  /// The login page's Turnstile token (single use).
+  final String? turnstileToken;
+
+  LoginWithAccountId({required this.username, required this.password, this.turnstileToken});
 }
 
 class LogoutRequested extends AuthEvent {}

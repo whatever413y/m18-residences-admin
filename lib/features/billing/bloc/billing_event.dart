@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:equatable/equatable.dart';
+import 'package:m18_residences_admin/features/billing/bloc/bill_scope.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 abstract class BillingEvent extends Equatable {
@@ -10,7 +11,18 @@ abstract class BillingEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+/// Loads the last twelve months' bills plus every open one, the years, rooms, tenants and readings.
 class LoadBills extends BillingEvent {}
+
+/// Loads the bills [view] needs, unless they are loaded already.
+class EnsureBills extends BillingEvent {
+  final BillView view;
+
+  const EnsureBills(this.view);
+
+  @override
+  List<Object?> get props => [view];
+}
 
 class AddBill extends BillingEvent {
   final BillRequest request;

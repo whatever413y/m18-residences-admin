@@ -186,7 +186,7 @@ class _VerifyCardState extends State<_VerifyCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  buildBillFile(context, BillFileKind.payment, tenant?.name, bill.paymentUrl),
+                  buildBillFile(context, BillFileKind.payment, bill.id, tenant?.name, bill.paymentUrl),
                   FilledButton.icon(
                     onPressed: _busy ? null : _attachReceipt,
                     icon: _busy ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.task_alt),
