@@ -77,14 +77,29 @@ class ReadingsPageState extends State<ReadingsPage> {
   List<TableColumn<Reading>> _columns(Map<int, Tenant> tenants, Map<int, Room> rooms) {
     String tenantName(Reading reading) => tenants[reading.tenantId]?.name ?? 'Unknown Tenant';
     String roomName(Reading reading) => rooms[reading.roomId]?.name ?? 'Unknown Room';
+    final muted = Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
 
     return [
-      TableColumn('Tenant', (reading) => Text(tenantName(reading)), sortKey: (reading) => tenantName(reading).toLowerCase()),
+      TableColumn(
+        'Tenant',
+        (reading) => Text(tenantName(reading)),
+        // The room under the name: the table has no Room column.
+        tableCell: (reading) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(tenantName(reading)),
+            Text(roomName(reading), style: muted),
+          ],
+        ),
+        sortKey: (reading) => tenantName(reading).toLowerCase(),
+      ),
       TableColumn('Previous (kWh)', (reading) => Text('${reading.prevReading}'), sortKey: (reading) => reading.prevReading, numeric: true),
       TableColumn('Current (kWh)', (reading) => Text('${reading.currReading}'), sortKey: (reading) => reading.currReading, numeric: true),
       TableColumn('Consumption (kWh)', (reading) => Text('${reading.consumption}'), sortKey: (reading) => reading.consumption, numeric: true),
       TableColumn('Date', (reading) => Text(_dateFormat.format(reading.createdAt)), sortKey: (reading) => reading.createdAt),
-      TableColumn('Room', (reading) => Text(roomName(reading)), sortKey: (reading) => roomName(reading).toLowerCase()),
+      // Cards only: the table has the room under the tenant.
+      TableColumn('Room', (reading) => Text(roomName(reading)), sortKey: (reading) => roomName(reading).toLowerCase(), minWidth: double.infinity),
     ];
   }
 

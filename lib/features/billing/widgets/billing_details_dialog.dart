@@ -57,7 +57,7 @@ class BillingDetailsDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _row(context, 'Consumption', '$consumption kWh'),
+                _row(context, 'Consumption (${DateFormat.yMMMM().format(usageMonth(bill.createdAt))})', '$consumption kWh'),
                 _row(context, 'Electric Charges', formatPeso(bill.electricCharges)),
                 _row(context, 'Room Charges', formatPeso(bill.roomCharges)),
                 for (final charge in bill.additionalCharges.where((c) => c.amount >= 0))
