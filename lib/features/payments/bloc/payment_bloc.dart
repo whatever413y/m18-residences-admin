@@ -16,14 +16,12 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     on<RemovePaymentImage>(_onRemoveImage);
   }
 
-  static String _reason(Object e) => e is ApiException ? e.message : '$e';
-
   Future<void> _onLoadPayments(LoadPayments event, Emitter<PaymentState> emit) async {
     emit(PaymentLoading());
     try {
       emit(PaymentLoaded(await paymentApi.list()));
     } catch (e) {
-      emit(PaymentError('Failed to load the payment methods: ${_reason(e)}'));
+      emit(PaymentError(describeError('Failed to load the payment methods', e)));
     }
   }
 
@@ -33,7 +31,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
     try {
       created = await paymentApi.create(event.request);
     } catch (e) {
-      emit(PaymentActionFailed('Failed to add $name: ${_reason(e)}'));
+      emit(PaymentActionFailed(describeError('Failed to add $name', e)));
       return;
     }
     final png = event.png;
@@ -42,7 +40,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
         await paymentApi.uploadImage(created.id, png);
       } catch (e) {
         add(LoadPayments());
-        emit(PaymentActionFailed('$name was added, but its QR code was not: ${_reason(e)}'));
+        emit(PaymentActionFailed(describeError('$name was added, but its QR code was not', e)));
         return;
       }
     }
@@ -56,7 +54,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
       add(LoadPayments());
       emit(PaymentActionSucceeded('${updated.name} saved'));
     } catch (e) {
-      emit(PaymentActionFailed('Failed to save ${event.request.name}: ${_reason(e)}'));
+      emit(PaymentActionFailed(describeError('Failed to save ${event.request.name}', e)));
     }
   }
 
@@ -68,7 +66,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
       emit(PaymentActionSucceeded('${event.method.name} deleted'));
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(PaymentActionFailed('Failed to delete ${event.method.name}: ${_reason(e)}'));
+      emit(PaymentActionFailed(describeError('Failed to delete ${event.method.name}', e)));
     }
   }
 
@@ -79,7 +77,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
       add(LoadPayments());
       emit(PaymentActionSucceeded(event.method.hasImage ? '$name QR code replaced' : '$name QR code uploaded'));
     } catch (e) {
-      emit(PaymentActionFailed('Failed to upload the $name QR code: ${_reason(e)}'));
+      emit(PaymentActionFailed(describeError('Failed to upload the $name QR code', e)));
     }
   }
 
@@ -92,7 +90,7 @@ class PaymentBloc extends Bloc<PaymentEvent, PaymentState> {
       emit(PaymentActionSucceeded('$name QR code removed'));
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(PaymentActionFailed('Failed to remove the $name QR code: ${_reason(e)}'));
+      emit(PaymentActionFailed(describeError('Failed to remove the $name QR code', e)));
     }
   }
 }

@@ -54,7 +54,7 @@ class _PaymentCardState extends State<PaymentCard> {
     try {
       file = await pickFile(receiptExtensions.where((extension) => extension != 'pdf').toList());
     } catch (e) {
-      setState(() => _error = 'Could not open the file picker: $e');
+      setState(() => _error = describeError('Could not open the file picker', e));
       return;
     }
     if (file == null || !mounted) return;
@@ -64,7 +64,7 @@ class _PaymentCardState extends State<PaymentCard> {
       final png = await prepareQrPng(file.bytes);
       if (mounted) widget.onUpload(png);
     } catch (e) {
-      if (mounted) setState(() => _error = e is ReceiptException ? e.message : 'Could not read the image: $e');
+      if (mounted) setState(() => _error = e is ReceiptException ? e.message : describeError('Could not read the image', e));
     } finally {
       if (mounted) setState(() => _converting = false);
     }
@@ -204,8 +204,7 @@ class _PaymentCardState extends State<PaymentCard> {
       future: file,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          final error = snapshot.error;
-          return Text('QR code not available: ${error is ApiException ? error.message : error}', style: muted, textAlign: TextAlign.center);
+          return Text(describeError('QR code not available', snapshot.error!), style: muted, textAlign: TextAlign.center);
         }
         if (!snapshot.hasData) return const CircularProgressIndicator();
         return InkWell(

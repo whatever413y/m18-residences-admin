@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
-import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/auth/auth_state.dart';
 import 'package:m18_residences_admin/features/billing/billings_page.dart';
 import 'package:m18_residences_admin/features/billing/bloc/billing_bloc.dart';
@@ -176,8 +175,6 @@ class AdminShellState extends State<AdminShell> {
       AppToast.show(context, state.message, type: ToastType.error);
     } else if (state is BillingError) {
       AppToast.hide();
-      // A failed load may mean the session expired; the auth check then shows the login error.
-      context.read<AuthBloc>().add(CheckAuthStatus());
     } else if (state is AddSuccess) {
       AppToast.show(context, 'Bill created', type: ToastType.success);
     } else if (state is UpdateSuccess) {

@@ -7,6 +7,11 @@ import 'package:m18_residences_admin/features/shell/admin_shell.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 class LoginPage extends StatefulWidget {
+  /// Shown above the form, e.g. why the app came back here ("Your session has ended…").
+  final String? notice;
+
+  const LoginPage({super.key, this.notice});
+
   @override
   State<LoginPage> createState() => LoginPageState();
 }
@@ -141,6 +146,7 @@ class LoginPageState extends State<LoginPage> {
                   Text('Admin Login', style: theme.textTheme.titleLarge),
                   const SizedBox(height: 4),
                   Text('Sign in with the owner account.', style: theme.textTheme.bodySmall),
+                  if (widget.notice case final notice?) ...[const SizedBox(height: 16), InfoBanner(notice, semanticsId: 'login-notice')],
                   const SizedBox(height: 20),
                   _buildUsernameField(),
                   const SizedBox(height: 16),

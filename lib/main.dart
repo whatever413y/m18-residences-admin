@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:m18_residences_admin/bloc_providers.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_event.dart';
+import 'package:m18_residences_admin/features/auth/auth_state.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 import 'features/login/login_page.dart';
@@ -19,6 +20,8 @@ Future<void> main() async {
   // Browser e2e builds (--dart-define=E2E=true) need the semantics tree so tests can find widgets by identifier.
   if (const bool.fromEnvironment('E2E')) SemanticsBinding.instance.ensureSemantics();
 }
+
+final _navigator = GlobalKey<NavigatorState>();
 
 class MyApp extends StatelessWidget {
   /// Light, dark or the system's look (the switch beside the brand in the navigation).
@@ -37,14 +40,23 @@ class MyApp extends StatelessWidget {
         },
         child: ThemeModeScope(
           controller: themeMode,
-          child: Builder(
-            builder: (context) => MaterialApp(
-              debugShowCheckedModeBanner: false,
-              title: 'M18 Residences Admin',
-              theme: AppTheme.light,
-              darkTheme: AppTheme.dark,
-              themeMode: ThemeModeScope.of(context).value,
-              home: LoginPage(),
+          // A login that expires while the app is in use (any 401) goes back to the login page with a notice.
+          child: BlocListener<AuthBloc, AuthState>(
+            listenWhen: (_, state) => state is Unauthenticated && state.sessionExpired,
+            listener: (_, state) => _navigator.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => LoginPage(notice: (state as Unauthenticated).message)),
+              (route) => false,
+            ),
+            child: Builder(
+              builder: (context) => MaterialApp(
+                navigatorKey: _navigator,
+                debugShowCheckedModeBanner: false,
+                title: 'M18 Residences Admin',
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: ThemeModeScope.of(context).value,
+                home: LoginPage(),
+              ),
             ),
           ),
         ),

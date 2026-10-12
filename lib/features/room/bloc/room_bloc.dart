@@ -13,15 +13,13 @@ class RoomBloc extends Bloc<RoomEvent, RoomState> {
     on<DeleteRoom>(_onDeleteRoom);
   }
 
-  static String _reason(Object e) => e is ApiException ? e.message : '$e';
-
   Future<void> _onLoadRooms(LoadRooms event, Emitter<RoomState> emit) async {
     emit(RoomLoading());
     try {
       final rooms = await roomApi.list();
       emit(RoomLoaded(rooms));
     } catch (e) {
-      emit(RoomError('Failed to load rooms: ${_reason(e)}'));
+      emit(RoomError(describeError('Failed to load rooms', e)));
     }
   }
 
@@ -31,7 +29,7 @@ class RoomBloc extends Bloc<RoomEvent, RoomState> {
       add(LoadRooms());
       emit(AddSuccess());
     } catch (e) {
-      emit(RoomActionFailed('Failed to create room: ${_reason(e)}'));
+      emit(RoomActionFailed(describeError('Failed to create room', e)));
     }
   }
 
@@ -41,7 +39,7 @@ class RoomBloc extends Bloc<RoomEvent, RoomState> {
       add(LoadRooms());
       emit(UpdateSuccess());
     } catch (e) {
-      emit(RoomActionFailed('Failed to update room: ${_reason(e)}'));
+      emit(RoomActionFailed(describeError('Failed to update room', e)));
     }
   }
 
@@ -53,7 +51,7 @@ class RoomBloc extends Bloc<RoomEvent, RoomState> {
       emit(DeleteSuccess());
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(RoomActionFailed('Failed to delete room: ${_reason(e)}'));
+      emit(RoomActionFailed(describeError('Failed to delete room', e)));
     }
   }
 }

@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
-import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/payments/bloc/payment_bloc.dart';
 import 'package:m18_residences_admin/features/payments/bloc/payment_event.dart';
 import 'package:m18_residences_admin/features/payments/bloc/payment_state.dart';
@@ -75,8 +74,6 @@ class _PaymentsPageState extends State<PaymentsPage> {
             AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is PaymentError) {
             AppToast.hide();
-            // A failed load may mean the session expired; the auth check then shows the login error.
-            context.read<AuthBloc>().add(CheckAuthStatus());
           } else if (state is PaymentActionSucceeded) {
             AppToast.show(context, state.message, type: ToastType.success);
           }

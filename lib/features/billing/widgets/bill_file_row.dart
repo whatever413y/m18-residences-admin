@@ -152,7 +152,7 @@ class _BillFileFieldState extends State<BillFileField> {
     try {
       file = await pickFile(receiptExtensions);
     } catch (e) {
-      setState(() => _error = 'Could not open the file picker: $e');
+      setState(() => _error = describeError('Could not open the file picker', e));
       return;
     }
     // Cancelling the picker keeps the file picked before (if any).
@@ -164,7 +164,7 @@ class _BillFileFieldState extends State<BillFileField> {
     try {
       prepared = await prepareReceipt(file.name, file.bytes);
     } catch (e) {
-      if (mounted) setState(() => _error = e is ReceiptException ? e.message : 'Could not read the file: $e');
+      if (mounted) setState(() => _error = e is ReceiptException ? e.message : describeError('Could not read the file', e));
     }
     if (!mounted) return;
     setState(() {

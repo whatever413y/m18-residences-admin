@@ -107,7 +107,7 @@ class _VerifyCardState extends State<_VerifyCard> {
     try {
       file = await pickFile(receiptExtensions);
     } catch (e) {
-      setState(() => _error = 'Could not open the file picker: $e');
+      setState(() => _error = describeError('Could not open the file picker', e));
       return;
     }
     if (file == null || !mounted) return;
@@ -129,7 +129,7 @@ class _VerifyCardState extends State<_VerifyCard> {
       AppToast.show(context, 'Attaching receipt...', type: ToastType.loading);
       context.read<BillingBloc>().add(UpdateBill(bill.id, request, receipt: receipt));
     } catch (e) {
-      if (mounted) setState(() => _error = e is ReceiptException ? e.message : 'Could not read the file: $e');
+      if (mounted) setState(() => _error = e is ReceiptException ? e.message : describeError('Could not read the file', e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

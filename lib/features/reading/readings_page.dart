@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
-import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_bloc.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_event.dart';
 import 'package:m18_residences_admin/features/reading/bloc/reading_state.dart';
@@ -158,8 +156,6 @@ class ReadingsPageState extends State<ReadingsPage> {
             AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is ReadingError) {
             AppToast.hide();
-            // A failed load may mean the session expired; the auth check then shows the login error.
-            context.read<AuthBloc>().add(CheckAuthStatus());
           } else if (state is AddSuccess) {
             AppToast.show(context, 'Reading created', type: ToastType.success);
           } else if (state is UpdateSuccess) {

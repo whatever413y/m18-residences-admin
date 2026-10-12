@@ -16,8 +16,6 @@ class ReadingBloc extends Bloc<ReadingEvent, ReadingState> {
     on<DeleteReading>(_onDeleteReading);
   }
 
-  static String _reason(Object e) => e is ApiException ? e.message : '$e';
-
   Future<void> _onLoadReadings(LoadReadings event, Emitter<ReadingState> emit) async {
     emit(ReadingLoading());
     try {
@@ -25,7 +23,7 @@ class ReadingBloc extends Bloc<ReadingEvent, ReadingState> {
       final data = await Future.wait<Object>([readingApi.list(), roomApi.list(), tenantApi.list()]);
       emit(ReadingLoaded(data[0] as List<Reading>, data[1] as List<Room>, data[2] as List<Tenant>));
     } catch (e) {
-      emit(ReadingError('Failed to load readings: ${_reason(e)}'));
+      emit(ReadingError(describeError('Failed to load readings', e)));
     }
   }
 
@@ -35,7 +33,7 @@ class ReadingBloc extends Bloc<ReadingEvent, ReadingState> {
       add(LoadReadings());
       emit(AddSuccess());
     } catch (e) {
-      emit(ReadingActionFailed('Failed to add reading: ${_reason(e)}'));
+      emit(ReadingActionFailed(describeError('Failed to add reading', e)));
     }
   }
 
@@ -45,7 +43,7 @@ class ReadingBloc extends Bloc<ReadingEvent, ReadingState> {
       add(LoadReadings());
       emit(UpdateSuccess());
     } catch (e) {
-      emit(ReadingActionFailed('Failed to update reading: ${_reason(e)}'));
+      emit(ReadingActionFailed(describeError('Failed to update reading', e)));
     }
   }
 
@@ -57,7 +55,7 @@ class ReadingBloc extends Bloc<ReadingEvent, ReadingState> {
       emit(DeleteSuccess());
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(ReadingActionFailed('Failed to delete reading: ${_reason(e)}'));
+      emit(ReadingActionFailed(describeError('Failed to delete reading', e)));
     }
   }
 }

@@ -14,8 +14,6 @@ class TenantBloc extends Bloc<TenantEvent, TenantState> {
     on<DeleteTenant>(_onDeleteTenant);
   }
 
-  static String _reason(Object e) => e is ApiException ? e.message : '$e';
-
   Future<void> _onLoadTenants(LoadTenants event, Emitter<TenantState> emit) async {
     emit(TenantLoading());
     try {
@@ -23,7 +21,7 @@ class TenantBloc extends Bloc<TenantEvent, TenantState> {
       final data = await Future.wait<Object>([tenantApi.list(), roomApi.list()]);
       emit(TenantLoaded(data[0] as List<Tenant>, data[1] as List<Room>));
     } catch (e) {
-      emit(TenantError('Failed to load tenants: ${_reason(e)}'));
+      emit(TenantError(describeError('Failed to load tenants', e)));
     }
   }
 
@@ -33,7 +31,7 @@ class TenantBloc extends Bloc<TenantEvent, TenantState> {
       add(LoadTenants());
       emit(AddSuccess());
     } catch (e) {
-      emit(TenantActionFailed('Failed to add tenant: ${_reason(e)}'));
+      emit(TenantActionFailed(describeError('Failed to add tenant', e)));
     }
   }
 
@@ -43,7 +41,7 @@ class TenantBloc extends Bloc<TenantEvent, TenantState> {
       add(LoadTenants());
       emit(UpdateSuccess());
     } catch (e) {
-      emit(TenantActionFailed('Failed to update tenant: ${_reason(e)}'));
+      emit(TenantActionFailed(describeError('Failed to update tenant', e)));
     }
   }
 
@@ -55,7 +53,7 @@ class TenantBloc extends Bloc<TenantEvent, TenantState> {
       emit(DeleteSuccess());
     } catch (e) {
       event.onComplete.completeError(e);
-      emit(TenantActionFailed('Failed to delete tenant: ${_reason(e)}'));
+      emit(TenantActionFailed(describeError('Failed to delete tenant', e)));
     }
   }
 }

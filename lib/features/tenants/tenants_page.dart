@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:m18_residences_admin/features/auth/auth_bloc.dart';
-import 'package:m18_residences_admin/features/auth/auth_event.dart';
 import 'package:m18_residences_admin/features/tenants/bloc/tenant_bloc.dart';
 import 'package:m18_residences_admin/features/tenants/bloc/tenant_event.dart';
 import 'package:m18_residences_admin/features/tenants/bloc/tenant_state.dart';
@@ -92,8 +91,6 @@ class _TenantsPageState extends State<TenantsPage> {
           if (state is TenantActionFailed) {
             AppToast.show(context, state.message, type: ToastType.error);
           } else if (state is TenantError) {
-            // A failed load may mean the session expired; the auth check then shows the login error.
-            authBloc.add(CheckAuthStatus());
           } else if (state is AddSuccess) {
             AppToast.show(context, 'Tenant created', type: ToastType.success);
           } else if (state is UpdateSuccess) {

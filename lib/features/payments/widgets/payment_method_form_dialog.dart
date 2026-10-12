@@ -70,7 +70,7 @@ class _PaymentMethodFormDialogState extends State<PaymentMethodFormDialog> with 
     try {
       file = await pickFile(receiptExtensions.where((extension) => extension != 'pdf').toList());
     } catch (e) {
-      setState(() => _qrError = 'Could not open the file picker: $e');
+      setState(() => _qrError = describeError('Could not open the file picker', e));
       return;
     }
     if (file == null || !mounted) return;
@@ -79,7 +79,7 @@ class _PaymentMethodFormDialogState extends State<PaymentMethodFormDialog> with 
       final png = await prepareQrPng(file.bytes);
       if (mounted) setState(() => _png = png);
     } catch (e) {
-      if (mounted) setState(() => _qrError = e is ReceiptException ? e.message : 'Could not read the image: $e');
+      if (mounted) setState(() => _qrError = e is ReceiptException ? e.message : describeError('Could not read the image', e));
     } finally {
       if (mounted) setState(() => _converting = false);
     }
