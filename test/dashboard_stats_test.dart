@@ -61,14 +61,24 @@ void main() {
 
   test('attention lists payments to verify first, then unpaid bills past their grace month, newest first', () {
     final stats = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants, now: DateTime(2026, 11, 3));
-    expect(stats.attention.map((b) => b.id), [2, 5]); // bill 3 (October) is still in its grace month
+    expect(stats.attention.map((b) => b.id), [2]); // bill 3 (October) is still in its grace month
     expect(stats.recentUnpaid, 1);
   });
 
   test('an unpaid bill joins attention once its grace month is over', () {
     final stats = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants, now: DateTime(2026, 12, 1));
-    expect(stats.attention.map((b) => b.id), [2, 3, 5]);
+    expect(stats.attention.map((b) => b.id), [2, 3]);
     expect(stats.recentUnpaid, 0);
+  });
+
+  test('attention leaves out bills of tenants who are no longer active', () {
+    final former = [
+      bill(20, tenant: 3, at: DateTime(2026, 6, 1), total: 1000), // CHARLIE moved out
+      bill(21, tenant: 3, at: DateTime(2026, 7, 1), total: 1000, payment: 'p21'),
+      bill(22, tenant: 1, at: DateTime(2026, 6, 1), total: 1000),
+    ];
+    final stats = DashboardStats.from(bills: former, rooms: rooms, tenants: tenants, now: DateTime(2026, 11, 3));
+    expect(stats.attention.map((b) => b.id), [22]);
   });
 
   test('an unpaid bill is left out once the same tenant has a newer bill with a receipt', () {

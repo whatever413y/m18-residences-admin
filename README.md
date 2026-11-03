@@ -13,7 +13,7 @@ Opening a page reloads its data; pages stay built, so filters are kept. Light an
 (`AppTheme.light` / `AppTheme.dark` from `m18_residences_shared`).
 
 - **Dashboard** (`lib/features/dashboard/`): for the latest bill month, billed, collected (bills with a receipt),
-  outstanding and occupancy (rooms with an active tenant); the bills that need attention (payments to verify, then
+  outstanding and occupancy (rooms with an active tenant); the bills of active tenants that need attention (payments to verify, then
   unpaid bills after a month's grace, as tenants often pay a month late; an unpaid bill whose tenant has a newer bill
   with a receipt is left out, as one payment often covers both and its receipt goes on the newer bill); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
 - **Verify** (`lib/features/verify/`): bills with a tenant's payment and no receipt; View payment, then **Attach

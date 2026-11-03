@@ -25,9 +25,9 @@ class DashboardStats {
   /// The twelve months up to [month], oldest first.
   final List<MonthTotals> history;
 
-  /// Bills needing the owner: payments to verify first, then unpaid bills past their grace month (posted before the
-  /// start of last month); newest first within each. An unpaid bill whose tenant has a newer bill with a receipt is
-  /// left out: one payment often covers both, and its receipt goes on the newer bill only.
+  /// Bills of active tenants needing the owner: payments to verify first, then unpaid bills past their grace month
+  /// (posted before the start of last month); newest first within each. An unpaid bill whose tenant has a newer bill
+  /// with a receipt is left out: one payment often covers both, and its receipt goes on the newer bill only.
   final List<Bill> attention;
 
   /// Unpaid bills still in their grace month (and not settled by a newer receipt), left out of [attention] (tenants
@@ -75,13 +75,15 @@ class DashboardStats {
     final occupied = active.map((t) => t.roomId).toSet().intersection(rooms.map((r) => r.id).toSet());
 
     List<Bill> newestFirst(Iterable<Bill> list) => list.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final activeIds = active.map((t) => t.id).toSet();
+    final current = bills.where((b) => activeIds.contains(b.tenantId));
     final dueBefore = DateTime(today.year, today.month - 1);
     final lastPaid = <int, DateTime>{};
-    for (final b in bills.where((b) => b.status == BillStatus.paid)) {
+    for (final b in current.where((b) => b.status == BillStatus.paid)) {
       final seen = lastPaid[b.tenantId];
       if (seen == null || b.createdAt.isAfter(seen)) lastPaid[b.tenantId] = b.createdAt;
     }
-    final unpaid = bills.where((b) => b.status == BillStatus.unpaid && !(lastPaid[b.tenantId]?.isAfter(b.createdAt) ?? false));
+    final unpaid = current.where((b) => b.status == BillStatus.unpaid && !(lastPaid[b.tenantId]?.isAfter(b.createdAt) ?? false));
     final overdue = unpaid.where((b) => b.createdAt.isBefore(dueBefore));
 
     return DashboardStats(
@@ -95,7 +97,7 @@ class DashboardStats {
       roomCount: rooms.length,
       activeTenants: active.length,
       history: history,
-      attention: [...newestFirst(bills.where((b) => b.status == BillStatus.forVerification)), ...newestFirst(overdue)],
+      attention: [...newestFirst(current.where((b) => b.status == BillStatus.forVerification)), ...newestFirst(overdue)],
       recentUnpaid: unpaid.length - overdue.length,
     );
   }
