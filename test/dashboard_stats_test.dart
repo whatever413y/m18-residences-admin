@@ -30,7 +30,7 @@ void main() {
     bill(1, tenant: 1, at: DateTime(2026, 9, 1), total: 1000, receipt: 'r1'),
     bill(2, tenant: 1, at: DateTime(2026, 10, 1), total: 2000, payment: 'p2'),
     bill(3, tenant: 2, at: DateTime(2026, 10, 2), total: 3000),
-    bill(4, tenant: 2, at: DateTime(2026, 10, 3), total: 4000, payment: 'p4', receipt: 'r4'),
+    bill(4, tenant: 2, at: DateTime(2026, 10, 1), total: 4000, payment: 'p4', receipt: 'r4'), // older than bill 3: doesn't settle it
     bill(5, tenant: 3, at: DateTime(2025, 10, 1), total: 500), // a year ago: outside the 12 months
   ];
 
@@ -69,6 +69,17 @@ void main() {
     final stats = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants, now: DateTime(2026, 12, 1));
     expect(stats.attention.map((b) => b.id), [2, 3, 5]);
     expect(stats.recentUnpaid, 0);
+  });
+
+  test('an unpaid bill is left out once the same tenant has a newer bill with a receipt', () {
+    final paidTogether = [
+      bill(10, tenant: 1, at: DateTime(2026, 8, 1), total: 1000),
+      bill(11, tenant: 1, at: DateTime(2026, 9, 1), total: 1000, receipt: 'r11'), // covers August too
+      bill(12, tenant: 2, at: DateTime(2026, 8, 1), total: 1000),
+      bill(13, tenant: 2, at: DateTime(2026, 9, 1), total: 1000, payment: 'p13'), // not verified yet
+    ];
+    final stats = DashboardStats.from(bills: paidTogether, rooms: rooms, tenants: tenants, now: DateTime(2026, 11, 3));
+    expect(stats.attention.map((b) => b.id), [13, 12]);
   });
 
   test('no bills: this month, all zero', () {

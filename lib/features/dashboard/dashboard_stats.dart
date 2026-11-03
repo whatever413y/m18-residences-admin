@@ -26,10 +26,12 @@ class DashboardStats {
   final List<MonthTotals> history;
 
   /// Bills needing the owner: payments to verify first, then unpaid bills past their grace month (posted before the
-  /// start of last month); newest first within each.
+  /// start of last month); newest first within each. An unpaid bill whose tenant has a newer bill with a receipt is
+  /// left out: one payment often covers both, and its receipt goes on the newer bill only.
   final List<Bill> attention;
 
-  /// Unpaid bills still in their grace month, left out of [attention] (tenants often pay a month late).
+  /// Unpaid bills still in their grace month (and not settled by a newer receipt), left out of [attention] (tenants
+  /// often pay a month late).
   final int recentUnpaid;
 
   const DashboardStats({
@@ -74,7 +76,12 @@ class DashboardStats {
 
     List<Bill> newestFirst(Iterable<Bill> list) => list.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     final dueBefore = DateTime(today.year, today.month - 1);
-    final unpaid = bills.where((b) => b.status == BillStatus.unpaid);
+    final lastPaid = <int, DateTime>{};
+    for (final b in bills.where((b) => b.status == BillStatus.paid)) {
+      final seen = lastPaid[b.tenantId];
+      if (seen == null || b.createdAt.isAfter(seen)) lastPaid[b.tenantId] = b.createdAt;
+    }
+    final unpaid = bills.where((b) => b.status == BillStatus.unpaid && !(lastPaid[b.tenantId]?.isAfter(b.createdAt) ?? false));
     final overdue = unpaid.where((b) => b.createdAt.isBefore(dueBefore));
 
     return DashboardStats(
