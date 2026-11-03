@@ -25,8 +25,12 @@ class DashboardStats {
   /// The twelve months up to [month], oldest first.
   final List<MonthTotals> history;
 
-  /// Bills needing the owner: payments to verify first, then unpaid bills; newest first within each.
+  /// Bills needing the owner: payments to verify first, then unpaid bills past their grace month (posted before the
+  /// start of last month); newest first within each.
   final List<Bill> attention;
+
+  /// Unpaid bills still in their grace month, left out of [attention] (tenants often pay a month late).
+  final int recentUnpaid;
 
   const DashboardStats({
     required this.month,
@@ -40,13 +44,15 @@ class DashboardStats {
     required this.activeTenants,
     required this.history,
     required this.attention,
+    required this.recentUnpaid,
   });
 
   int get outstanding => billed - collected;
   int get billCount => unpaidCount + verifyingCount + paidCount;
 
   factory DashboardStats.from({required List<Bill> bills, required List<Room> rooms, required List<Tenant> tenants, DateTime? now}) {
-    final latest = bills.isEmpty ? (now ?? DateTime.now()) : bills.map((b) => b.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
+    final today = now ?? DateTime.now();
+    final latest = bills.isEmpty ? today : bills.map((b) => b.createdAt).reduce((a, b) => a.isAfter(b) ? a : b);
     final month = DateTime(latest.year, latest.month);
     bool inMonth(Bill b, DateTime m) => b.createdAt.year == m.year && b.createdAt.month == m.month;
 
@@ -66,7 +72,10 @@ class DashboardStats {
     final active = tenants.where((t) => t.isActive);
     final occupied = active.map((t) => t.roomId).toSet().intersection(rooms.map((r) => r.id).toSet());
 
-    List<Bill> newestFirst(BillStatus s) => bills.where((b) => b.status == s).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    List<Bill> newestFirst(Iterable<Bill> list) => list.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final dueBefore = DateTime(today.year, today.month - 1);
+    final unpaid = bills.where((b) => b.status == BillStatus.unpaid);
+    final overdue = unpaid.where((b) => b.createdAt.isBefore(dueBefore));
 
     return DashboardStats(
       month: month,
@@ -79,7 +88,8 @@ class DashboardStats {
       roomCount: rooms.length,
       activeTenants: active.length,
       history: history,
-      attention: [...newestFirst(BillStatus.forVerification), ...newestFirst(BillStatus.unpaid)],
+      attention: [...newestFirst(bills.where((b) => b.status == BillStatus.forVerification)), ...newestFirst(overdue)],
+      recentUnpaid: unpaid.length - overdue.length,
     );
   }
 }

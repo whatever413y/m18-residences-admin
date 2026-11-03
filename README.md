@@ -14,7 +14,7 @@ Opening a page reloads its data; pages stay built, so filters are kept. Light an
 
 - **Dashboard** (`lib/features/dashboard/`): for the latest bill month, billed, collected (bills with a receipt),
   outstanding and occupancy (rooms with an active tenant); the bills that need attention (payments to verify, then
-  unpaid); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
+  unpaid bills after a month's grace, as tenants often pay a month late); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
 - **Verify** (`lib/features/verify/`): bills with a tenant's payment and no receipt; View payment, then **Attach
   receipt** (the same upload as the Update Bill form) marks the bill Paid. The rail shows how many are waiting.
 - **Search** (every page's app bar): tenants and rooms; picking one opens Billing with all of their bills.

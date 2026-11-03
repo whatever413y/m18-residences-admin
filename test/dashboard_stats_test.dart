@@ -59,9 +59,16 @@ void main() {
     expect((history[11].billed, history[11].collected), (9000, 4000));
   });
 
-  test('attention lists payments to verify first, then unpaid bills, newest first', () {
-    final attention = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants).attention;
-    expect(attention.map((b) => b.id), [2, 3, 5]);
+  test('attention lists payments to verify first, then unpaid bills past their grace month, newest first', () {
+    final stats = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants, now: DateTime(2026, 11, 3));
+    expect(stats.attention.map((b) => b.id), [2, 5]); // bill 3 (October) is still in its grace month
+    expect(stats.recentUnpaid, 1);
+  });
+
+  test('an unpaid bill joins attention once its grace month is over', () {
+    final stats = DashboardStats.from(bills: bills, rooms: rooms, tenants: tenants, now: DateTime(2026, 12, 1));
+    expect(stats.attention.map((b) => b.id), [2, 3, 5]);
+    expect(stats.recentUnpaid, 0);
   });
 
   test('no bills: this month, all zero', () {
