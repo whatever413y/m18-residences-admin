@@ -101,15 +101,15 @@ class _VerifyCardState extends State<_VerifyCard> {
   /// Picks the receipt, converts it in the browser and saves it on the bill (unchanged charges).
   Future<void> _attachReceipt() async {
     final bill = widget.bill;
-    final file = await pickOrPasteFile(context, receiptExtensions, title: 'Attach receipt');
-    if (file == null || !mounted) return;
+    final files = await pickOrPasteFiles(context, receiptExtensions, title: 'Attach receipt');
+    if (files == null || !mounted) return;
 
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final receipt = await prepareReceipt(file.name, file.bytes);
+      final receipt = await prepareReceipts(files);
       if (!mounted) return;
       final request = BillRequest(
         tenantId: bill.tenantId,

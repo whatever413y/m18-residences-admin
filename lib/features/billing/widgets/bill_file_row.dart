@@ -159,15 +159,15 @@ class _BillFileFieldState extends State<BillFileField> {
   }
 
   Future<void> _pick() async {
-    final file = await pickOrPasteFile(context, receiptExtensions, title: 'Attach ${widget.kind.subject}');
+    final files = await pickOrPasteFiles(context, receiptExtensions, title: 'Attach ${widget.kind.subject}');
     // Closing the chooser keeps the file picked before (if any).
-    if (file == null || !mounted) return;
+    if (files == null || !mounted) return;
 
     _error = null;
     _setPreparing(true);
     PreparedReceipt? prepared;
     try {
-      prepared = await prepareReceipt(file.name, file.bytes);
+      prepared = await prepareReceipts(files);
     } catch (e) {
       if (mounted) setState(() => _error = e is ReceiptException ? e.message : describeError('Could not read the file', e));
     }
