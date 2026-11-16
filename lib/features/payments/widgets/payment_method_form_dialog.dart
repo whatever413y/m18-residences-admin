@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:m18_residences_admin/utils/dirty_form.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 

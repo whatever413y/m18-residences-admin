@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A room or tenant in a list or grid: an avatar, a title and a subtitle, with Edit and Delete buttons.
 class EntityCard extends StatelessWidget {

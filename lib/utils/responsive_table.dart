@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 /// A column of a [ResponsiveTable]: its label, its cell, and (when sortable) the value it sorts by.

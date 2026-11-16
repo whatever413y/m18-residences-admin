@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
 
 /// Asks before a destructive action: [title] names what goes ("Delete ECHO's October 2026 bill?"), [message] says

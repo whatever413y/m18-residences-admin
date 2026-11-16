@@ -1,5 +1,5 @@
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Knows whether a form differs from how it opened: [formSnapshot] lists the values that count as a change
 /// (compared deeply), [markPristine] records them once the form is filled in (end of `initState`).
