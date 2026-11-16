@@ -66,13 +66,7 @@ class _PaymentMethodFormDialogState extends State<PaymentMethodFormDialog> with 
 
   Future<void> _pickQr() async {
     setState(() => _qrError = null);
-    final ({String name, Uint8List bytes})? file;
-    try {
-      file = await pickFile(receiptExtensions.where((extension) => extension != 'pdf').toList());
-    } catch (e) {
-      setState(() => _qrError = describeError('Could not open the file picker', e));
-      return;
-    }
+    final file = await pickOrPasteFile(context, receiptExtensions.where((extension) => extension != 'pdf').toList(), title: 'Upload QR code');
     if (file == null || !mounted) return;
     setState(() => _converting = true);
     try {

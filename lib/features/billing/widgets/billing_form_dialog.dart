@@ -335,6 +335,8 @@ class _BillingFormDialogState extends State<BillingFormDialog> with DirtyTrackin
           fileUrl: _paymentUrl,
           onChanged: (file) => setState(() => _payment = file),
           onPreparing: _onPreparing,
+          // A payment can be removed (the bill back to Unpaid) only while the bill has no receipt.
+          canRemoveSaved: !(_receiptUrl?.isNotEmpty ?? false) && _receipt == null,
           onRemove: () => setState(() {
             _removePayment = _paymentUrl?.isNotEmpty ?? false;
             _paymentUrl = null;

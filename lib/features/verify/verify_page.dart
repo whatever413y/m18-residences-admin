@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -103,13 +101,7 @@ class _VerifyCardState extends State<_VerifyCard> {
   /// Picks the receipt, converts it in the browser and saves it on the bill (unchanged charges).
   Future<void> _attachReceipt() async {
     final bill = widget.bill;
-    final ({String name, Uint8List bytes})? file;
-    try {
-      file = await pickFile(receiptExtensions);
-    } catch (e) {
-      setState(() => _error = describeError('Could not open the file picker', e));
-      return;
-    }
+    final file = await pickOrPasteFile(context, receiptExtensions, title: 'Attach receipt');
     if (file == null || !mounted) return;
 
     setState(() {

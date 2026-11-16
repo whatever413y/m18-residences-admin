@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:m18_residences_admin/utils/shared_widgets.dart';
 import 'package:m18_residences_shared/m18_residences_shared.dart';
@@ -86,7 +84,8 @@ ButtonStyle _rowButtonStyle() =>
 /// ([prepareReceipt]) and reports it through [onChanged] (`null` when nothing usable is picked). The row says what
 /// will happen on save: the bill's file kept (with View), a new file (name and size), the file removed, or the
 /// conversion progress or an error. Remove drops a picked file and reports through [onRemove] that the bill's own
-/// file should go too.
+/// file should go too; with [canRemoveSaved] false (the tenant's payment once the bill has a receipt) the bill's own
+/// file stays, and Remove only drops a picked file.
 ///
 /// Test ids: `bill-attach-<receipt|payment>` (Attach/Change), `bill-<receipt|payment>-file` (the picked file),
 /// `bill-remove-<receipt|payment>`, `bill-view-<receipt|payment>`.
@@ -107,6 +106,9 @@ class BillFileField extends StatefulWidget {
 
   final VoidCallback onRemove;
 
+  /// Whether the bill's own file may be removed (a picked file can always be dropped).
+  final bool canRemoveSaved;
+
   const BillFileField({
     super.key,
     required this.kind,
@@ -116,6 +118,7 @@ class BillFileField extends StatefulWidget {
     required this.onChanged,
     required this.onPreparing,
     required this.onRemove,
+    this.canRemoveSaved = true,
   });
 
   @override
@@ -133,6 +136,14 @@ class _BillFileFieldState extends State<BillFileField> {
   bool get _hasFile => widget.fileUrl?.isNotEmpty ?? false;
 
   void _remove() {
+    if (!widget.canRemoveSaved) {
+      // Only the picked file goes; the bill keeps its own.
+      setState(() {
+        _picked = null;
+        _error = null;
+      });
+      return widget.onChanged(null);
+    }
     setState(() {
       _picked = null;
       _error = null;
@@ -148,14 +159,8 @@ class _BillFileFieldState extends State<BillFileField> {
   }
 
   Future<void> _pick() async {
-    final ({String name, Uint8List bytes})? file;
-    try {
-      file = await pickFile(receiptExtensions);
-    } catch (e) {
-      setState(() => _error = describeError('Could not open the file picker', e));
-      return;
-    }
-    // Cancelling the picker keeps the file picked before (if any).
+    final file = await pickOrPasteFile(context, receiptExtensions, title: 'Attach ${widget.kind.subject}');
+    // Closing the chooser keeps the file picked before (if any).
     if (file == null || !mounted) return;
 
     _error = null;
@@ -198,6 +203,7 @@ class _BillFileFieldState extends State<BillFileField> {
       return Semantics(container: true, identifier: 'bill-$subject-file', child: Text(_label(picked)));
     }
     if (_removed) return const Text('Removed when you save (kept in the archive)');
+    if (_hasFile && !widget.canRemoveSaved) return const Text('Attached · can be removed only while the bill has no receipt');
     if (_hasFile) return const Text('Attached');
     return Text(widget.kind == BillFileKind.receipt ? 'No receipt yet' : 'No payment uploaded');
   }
@@ -208,7 +214,7 @@ class _BillFileFieldState extends State<BillFileField> {
     final picked = _picked;
     final billId = widget.billId;
     final showView = billId != null && _hasFile && picked == null && !_removed && !_preparing;
-    final canRemove = !_preparing && (_hasFile || picked != null);
+    final canRemove = !_preparing && (picked != null || (_hasFile && widget.canRemoveSaved));
     return BillFileRow(
       kind: widget.kind,
       present: (_hasFile && !_removed) || picked != null,
