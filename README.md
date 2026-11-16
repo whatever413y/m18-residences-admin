@@ -13,9 +13,8 @@ Opening a page reloads its data; pages stay built, so filters are kept. Light an
 (`AppTheme.light` / `AppTheme.dark` from `m18_residences_shared`).
 
 - **Dashboard** (`lib/features/dashboard/`): for the latest bill month, billed, collected (bills with a receipt),
-  outstanding and occupancy (rooms with an active tenant); the bills of active tenants that need attention (payments to verify, then
-  unpaid bills after a month's grace, as tenants often pay a month late; an unpaid bill whose tenant has a newer bill
-  with a receipt is left out, as one payment often covers both and its receipt goes on the newer bill); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
+  outstanding and occupancy (rooms with an active tenant); the bills of active tenants from this month and the two before that need
+  attention (payments to verify, then unpaid; an unpaid bill whose tenant has a newer bill with a receipt is left out, as one payment often covers both and its receipt goes on the newer bill); billed vs collected over 12 months. All computed in the app from the bills list (no extra request).
 - **Verify** (`lib/features/verify/`): bills with a tenant's payment and no receipt; View payment, then **Attach
   receipt** (the same upload as the Update Bill form) marks the bill Paid. The rail shows how many are waiting.
 - **Search** (every page's app bar): tenants and rooms; picking one opens Billing with all of their bills.
@@ -35,7 +34,7 @@ browser can't write WebP; a WebP already smaller than its re-encoding is kept); 
 heic-to asset (LGPL-3.0), loaded only when needed; PDFs are uploaded as-is. A receipt or payment can be attached
 when generating the bill or later (`lib/features/billing/widgets/attach_file_button.dart`), and removed with
 Remove in the Update Bill form (applied on save; Billing Details only shows the status and View buttons); replacing or removing one
-moves the old file to the archive (`archive/` in R2, kept forever). Files are picked with the shared `pickFile` (a plain file input that works on iPhone/iPad Safari).
+moves the old file to the archive (`archive/` in R2, kept forever). Attach/Change opens the shared `pickOrPasteFile` chooser: choose a file or paste a copied picture (Ctrl+V / ⌘V or Paste), check the preview, Save (`pickFile`, a plain file input that works on iPhone/iPad Safari).
 
 ## Payment QR codes
 

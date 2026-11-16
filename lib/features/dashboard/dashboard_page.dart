@@ -233,7 +233,7 @@ class _Kpi extends StatelessWidget {
   }
 }
 
-/// Payments to verify, then unpaid bills past their grace month; each opens the bill.
+/// Payments to verify, then unpaid bills, of active tenants from this month and the two before; each opens the bill.
 class _Attention extends StatelessWidget {
   final DashboardStats stats;
   final BillingLoaded data;
@@ -249,30 +249,22 @@ class _Attention extends StatelessWidget {
     final tenants = {for (final t in data.tenants) t.id: t};
     final rooms = {for (final r in data.rooms) r.id: r};
     final bills = stats.attention.take(_shown).toList();
-    final subtitle = [
-      if (stats.attention.isNotEmpty) '${stats.attention.length} bills to verify or collect',
-      if (stats.recentUnpaid > 0) '${stats.recentUnpaid} recent unpaid not shown yet',
-    ].join(' · ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppSection(
           title: 'Needs attention',
-          subtitle: subtitle.isEmpty ? null : subtitle,
+          subtitle: stats.attention.isEmpty ? null : '${stats.attention.length} bills to verify or collect',
           trailing: stats.verifyingCount > 0
               ? TextButton(onPressed: () => shell.select(AdminTab.verify), child: const Text('Verify payments'))
               : null,
         ),
         Card(
           child: bills.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: EmptyState(
-                    icon: Icons.task_alt,
-                    title: 'All caught up',
-                    message: stats.recentUnpaid > 0 ? 'Nothing overdue.' : 'Every bill is paid.',
-                  ),
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: EmptyState(icon: Icons.task_alt, title: 'All caught up', message: 'Nothing to verify or collect.'),
                 )
               : Column(
                   children: [
